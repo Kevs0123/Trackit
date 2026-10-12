@@ -31,7 +31,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthState>();
     try {
       if (_register) {
-        await auth.register(_name.text.trim(), _email.text.trim(), _phone.text.trim(), _password.text);
+        await auth.register(_name.text.trim(), _email.text.trim(),
+            _phone.text.trim(), _password.text);
       } else {
         await auth.login(_email.text.trim(), _password.text);
       }
@@ -43,12 +44,14 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  String? _required(String? v) => (v == null || v.trim().isEmpty) ? 'Required' : null;
+  String? _required(String? v) =>
+      (v == null || v.trim().isEmpty) ? 'Required' : null;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_register ? 'Create customer account' : 'Sign in')),
+      appBar: AppBar(
+          title: Text(_register ? 'Create customer account' : 'Sign in')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -62,21 +65,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (_register) ...[
                     TextFormField(
                       controller: _name,
-                      decoration: const InputDecoration(labelText: 'Full name', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                          labelText: 'Full name', border: OutlineInputBorder()),
                       validator: _required,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _phone,
                       keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(labelText: 'Phone (optional)', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                          labelText: 'Phone (optional)',
+                          border: OutlineInputBorder()),
                     ),
                     const SizedBox(height: 12),
                   ],
                   TextFormField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                        labelText: 'Email', border: OutlineInputBorder()),
                     validator: _required,
                   ),
                   const SizedBox(height: 12),
@@ -88,11 +95,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       labelText: 'Password',
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
-                        icon: Icon(_hide ? Icons.visibility : Icons.visibility_off),
+                        icon: Icon(
+                            _hide ? Icons.visibility : Icons.visibility_off),
                         onPressed: () => setState(() => _hide = !_hide),
                       ),
                     ),
-                    validator: (v) => (v == null || v.length < 6) ? 'At least 6 characters' : null,
+                    validator: (v) => (v == null || v.length < 6)
+                        ? 'At least 6 characters'
+                        : null,
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
@@ -106,7 +116,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(12),
                         child: _busy
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
                             : Text(_register ? 'Create account' : 'Sign in'),
                       ),
                     ),
@@ -116,14 +130,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       _register = !_register;
                       _error = null;
                     }),
-                    child: Text(_register ? 'Already have an account? Sign in' : 'New customer? Create an account'),
+                    child: Text(_register
+                        ? 'Already have an account? Sign in'
+                        : 'New customer? Create an account'),
                   ),
-                  if (!_register)
-                    Text(
-                      'Demo: admin@trackit.test, rider1@trackit.test, customer@trackit.test  /  password',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                    ),
                 ],
               ),
             ),

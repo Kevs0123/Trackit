@@ -10,6 +10,20 @@ class DatabaseSeeder extends Seeder
 {
     public function run(ParcelService $service): void
     {
+        if (app()->isProduction()) {
+            User::whereIn('email', [
+                'admin@trackit.test',
+                'rider1@trackit.test',
+                'rider2@trackit.test',
+                'customer@trackit.test',
+            ])->get()->each(function (User $user) {
+                $user->tokens()->delete();
+                $user->update(['is_active' => false]);
+            });
+
+            return;
+        }
+
         $admin = User::create([
             'name' => 'TrackIt Admin', 'email' => 'admin@trackit.test', 'password' => 'password',
             'role' => 'admin', 'phone' => '09170000000',

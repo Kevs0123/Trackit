@@ -78,3 +78,14 @@ Riders sign in with an account created by courier staff; public sign-up creates 
 6. Sign out from the top bar when finished.
 
 For local development only, the database seeder creates demo accounts (`admin@trackit.test`, `rider1@trackit.test`, `rider2@trackit.test`, and `customer@trackit.test`) with the password `password`. Do not use these demo credentials in a deployed environment.
+
+### Production admin setup
+
+Production seeding does not create demo users or parcels. It disables any existing seeded demo accounts and revokes their API tokens. After deploying the API, run these commands from the Railway service shell:
+
+```sh
+php artisan db:seed --force
+php artisan trackit:create-admin
+```
+
+The admin command prompts for a name, email, and a hidden password (minimum 12 characters). Use a unique password and do not paste it into chat or commit it to the repository. Sign in with that account, then add rider accounts from the admin **Riders** tab.
