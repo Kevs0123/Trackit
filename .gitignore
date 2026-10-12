@@ -1,0 +1,40 @@
+﻿# App dependencies and local configuration
+**/vendor/
+**/node_modules/
+**/.env
+**/.env.*
+!**/.env.example
+**/auth.json
+**/database/*.sqlite
+**/.phpunit.result.cache
+
+# Laravel generated data
+**/bootstrap/cache/*.php
+**/storage/framework/cache/data/**
+**/storage/framework/sessions/**
+**/storage/framework/views/**
+**/storage/logs/*.log
+**/public/build/
+**/public/hot
+
+# Flutter/Dart generated files
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+**/build/
+**/coverage/
+**/android/local.properties
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/ephemeral/
+**/ios/Pods/
+
+# Editor and operating system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

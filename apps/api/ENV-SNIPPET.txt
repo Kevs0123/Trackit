@@ -1,0 +1,17 @@
+# Put these in your Laravel .env (replace the default sqlite/DB lines)
+APP_URL=http://127.0.0.1:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=trackit
+DB_USERNAME=root
+DB_PASSWORD=
+
+# Emails are written to storage/logs/laravel.log (no mail server needed)
+MAIL_MAILER=log
+
+# TrackIt settings (all optional)
+FRONTEND_URL=http://localhost:8080
+GEOCODE_ENABLED=true
+GEOCODE_COUNTRY=ph
