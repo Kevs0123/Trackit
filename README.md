@@ -34,3 +34,47 @@ cd C:\Projects
 ```
 
 The script starts Laravel in the background, opens the Flutter web app in Chrome, and stops the API when you exit Flutter. It installs Composer or Flutter dependencies only if they are missing. The client uses `http://127.0.0.1:8000/api` by default.
+
+## User flows
+
+TrackIt has a public tracking flow and three signed-in roles: customer, rider, and admin (courier staff). After signing in, the app opens the home screen for the account's role. Sessions are remembered on the device until the user signs out.
+
+### Visitor
+
+1. Open the landing page.
+2. Enter a tracking number and choose **Track parcel**; no account is required.
+3. View the parcel status, tracking history, and available map locations. The page refreshes periodically while the delivery is active.
+4. After a parcel is delivered, submit a star rating and optional feedback.
+5. A visitor can sign in or create a customer account from the landing page.
+
+### Customer
+
+1. Create an account with name, email, and password (phone is optional), or sign in.
+2. From **My parcels**, choose **Book parcel** and enter sender/pickup details, receiver/delivery details, weight, and standard or express service.
+3. Review the estimated fee and submit the booking. The app shows the generated tracking number.
+4. Open a parcel to follow its status and history, or enter any tracking number in the search field.
+5. Cancel a parcel only while its status is still **booked**.
+6. Open **Notifications** to review parcel updates and mark all notifications as read.
+7. Sign out from the top bar when finished.
+
+### Rider
+
+Riders sign in with an account created by courier staff; public sign-up creates customer accounts only.
+
+1. Sign in to view assigned active deliveries and recent delivery history. New assignments appear automatically.
+2. Optionally choose **Optimize route** to order active stops and open directions in a maps app.
+3. For each delivery, use the status action to progress through **assigned → picked up → in transit → out for delivery → delivered**.
+4. If delivery cannot be completed, choose **Failed** and enter a reason. Use **Call** to contact the receiver.
+5. Optionally enable **Share my live location** and grant location permission. The location is shared while enabled so customers can see the rider on parcel tracking; location access requires HTTPS or localhost in the browser.
+6. Sign out from the top bar when finished.
+
+### Admin / courier staff
+
+1. Sign in with an admin account.
+2. Use **Dashboard** to monitor parcel totals, statuses, bookings, deliveries, and active riders; it refreshes automatically.
+3. In **Parcels**, search by tracking number or sender/receiver name and filter by status. Create bookings for customers, assign or reassign parcels to active riders, open tracking, or cancel parcels.
+4. In **Riders**, add rider accounts, activate or deactivate riders, and optimize a rider's route.
+5. In **Reports**, choose a date range to review delivery, rider, rating, and fee metrics, or export a CSV.
+6. Sign out from the top bar when finished.
+
+For local development only, the database seeder creates demo accounts (`admin@trackit.test`, `rider1@trackit.test`, `rider2@trackit.test`, and `customer@trackit.test`) with the password `password`. Do not use these demo credentials in a deployed environment.
