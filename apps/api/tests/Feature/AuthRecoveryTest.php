@@ -7,6 +7,7 @@ use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
@@ -38,6 +39,64 @@ class AuthRecoveryTest extends TestCase
             'password' => 'a-secure-password',
         ])->assertForbidden()
             ->assertJsonPath('message', 'Verify your email before signing in. You can request another verification email.');
+    }
+
+    public function test_registration_sends_verification_through_the_gmail_api_mailer(): void
+    {
+        config([
+            'mail.default' => 'gmail_api',
+            'mail.mailers.gmail_api' => [
+                'transport' => 'gmail_api',
+                'client_id' => 'test-client-id',
+                'client_secret' => 'test-client-secret',
+                'refresh_token' => 'test-refresh-token',
+            ],
+            'mail.from.address' => 'trackit@gmail.com',
+            'mail.from.name' => 'TrackIt',
+        ]);
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'access_token' => 'test-access-token',
+                'expires_in' => 3600,
+            ]),
+            'https://gmail.googleapis.com/gmail/v1/users/me/messages/send' => Http::response([
+                'id' => 'gmail-message-id',
+            ]),
+        ]);
+
+        $this->postJson('/api/auth/register', [
+            'name' => 'New Customer',
+            'email' => 'new-customer@example.com',
+            'password' => 'a-secure-password',
+        ])->assertCreated();
+
+        Http::assertSent(fn ($request) => $request->url() ===
+            'https://gmail.googleapis.com/gmail/v1/users/me/messages/send');
+    }
+
+    public function test_registration_returns_service_unavailable_when_gmail_api_cannot_be_reached(): void
+    {
+        config([
+            'mail.default' => 'gmail_api',
+            'mail.mailers.gmail_api' => [
+                'transport' => 'gmail_api',
+                'client_id' => 'test-client-id',
+                'client_secret' => 'test-client-secret',
+                'refresh_token' => 'test-refresh-token',
+            ],
+        ]);
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::failedConnection('network unavailable'),
+        ]);
+
+        $this->postJson('/api/auth/register', [
+            'name' => 'New Customer',
+            'email' => 'new-customer@example.com',
+            'password' => 'a-secure-password',
+        ])->assertServiceUnavailable()
+            ->assertJsonPath('message', 'We could not send the verification email. Please try again later.');
+
+        $this->assertDatabaseMissing('users', ['email' => 'new-customer@example.com']);
     }
 
     public function test_signed_verification_link_verifies_the_address_and_allows_login(): void

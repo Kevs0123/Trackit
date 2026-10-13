@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Mail\GmailApiTransport;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Mail::extend('gmail_api', fn (array $config) => new GmailApiTransport($config));
+
         VerifyEmail::createUrlUsing(fn (User $user) => URL::temporarySignedRoute(
             'verification.verify',
             now()->addMinutes(60),

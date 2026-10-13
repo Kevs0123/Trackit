@@ -94,21 +94,19 @@ The admin command prompts for a name, email, and a hidden password (minimum 12 c
 
 Customer registration sends a signed verification link and does not create a login session until the address is verified. Sign-in includes a resend-verification action for unverified customers. The sign-in screen also has a forgot-password flow; reset links return to the Flutter web app and expire after Laravel's configured reset-token lifetime.
 
-In production, the API defaults to SMTP rather than silently logging email if `MAIL_MAILER` is missing. Registration is rolled back if the verification email cannot be submitted to the configured mail server.
+In production, the API defaults to Gmail's HTTPS API rather than silently logging email if `MAIL_MAILER` is missing. Registration is rolled back if the verification email cannot be submitted.
 
-Configure these values as Railway service variables (never commit mail credentials):
+Configure these values as Railway service variables (never commit mail credentials). Railway's lower-cost plans block outbound SMTP, so use Gmail's HTTPS API rather than SMTP:
 
 ```text
 APP_URL=https://<your-railway-api-domain>
 FRONTEND_URL=https://trackit-c77df.web.app
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.resend.com
-MAIL_PORT=465
-MAIL_SCHEME=smtps
-MAIL_USERNAME=resend
-MAIL_PASSWORD=<Resend API key>
-MAIL_FROM_ADDRESS=<sender address verified with Resend>
+MAIL_MAILER=gmail_api
+MAIL_FROM_ADDRESS=<your Gmail address>
 MAIL_FROM_NAME=TrackIt
+GMAIL_OAUTH_CLIENT_ID=<Google OAuth client ID>
+GMAIL_OAUTH_CLIENT_SECRET=<Google OAuth client secret>
+GMAIL_OAUTH_REFRESH_TOKEN=<Google OAuth refresh token>
 ```
 
-Verify a sending domain/address in Resend and use it for `MAIL_FROM_ADDRESS`. Redeploy the API after changing Railway variables. Mail delivery must be configured for registration, verification resend, and password reset emails to work.
+Enable the Gmail API in a Google Cloud project, configure its OAuth consent screen, and generate an OAuth refresh token authorized for `https://www.googleapis.com/auth/gmail.send` from the Gmail account in `MAIL_FROM_ADDRESS`. Store the OAuth values only in Railway and redeploy after setting them. Google may require OAuth app verification for broader use; OAuth apps left in Testing can have refresh tokens expire after seven days. Gmail sending limits apply. The HTTPS API is used for registration verification, verification resend, and password-reset emails.

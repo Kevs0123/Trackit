@@ -16,7 +16,7 @@ return [
 
     'default' => env(
         'MAIL_MAILER',
-        env('APP_ENV', 'production') === 'production' ? 'smtp' : 'log',
+        env('APP_ENV', 'production') === 'production' ? 'gmail_api' : 'log',
     ),
 
     /*
@@ -39,6 +39,13 @@ return [
     */
 
     'mailers' => [
+
+        'gmail_api' => [
+            'transport' => 'gmail_api',
+            'client_id' => env('GMAIL_OAUTH_CLIENT_ID'),
+            'client_secret' => env('GMAIL_OAUTH_CLIENT_SECRET'),
+            'refresh_token' => env('GMAIL_OAUTH_REFRESH_TOKEN'),
+        ],
 
         'smtp' => [
             'transport' => 'smtp',
