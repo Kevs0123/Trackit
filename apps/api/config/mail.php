@@ -14,7 +14,10 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    'default' => env(
+        'MAIL_MAILER',
+        env('APP_ENV', 'production') === 'production' ? 'smtp' : 'log',
+    ),
 
     /*
     |--------------------------------------------------------------------------

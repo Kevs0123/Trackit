@@ -94,6 +94,8 @@ The admin command prompts for a name, email, and a hidden password (minimum 12 c
 
 Customer registration sends a signed verification link and does not create a login session until the address is verified. Sign-in includes a resend-verification action for unverified customers. The sign-in screen also has a forgot-password flow; reset links return to the Flutter web app and expire after Laravel's configured reset-token lifetime.
 
+In production, the API defaults to SMTP rather than silently logging email if `MAIL_MAILER` is missing. Registration is rolled back if the verification email cannot be submitted to the configured mail server.
+
 Configure these values as Railway service variables (never commit mail credentials):
 
 ```text

@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class AuthController extends Controller
 {
@@ -23,8 +25,18 @@ class AuthController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
-        $user = User::create($data + ['role' => 'customer']);
-        $user->sendEmailVerificationNotification();
+        try {
+            DB::transaction(function () use ($data) {
+                $user = User::create($data + ['role' => 'customer']);
+                $user->sendEmailVerificationNotification();
+            });
+        } catch (TransportExceptionInterface $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'We could not send the verification email. Please try again later.',
+            ], 503);
+        }
 
         return response()->json([
             'message' => 'Account created. Check your email for a verification link before signing in.',
