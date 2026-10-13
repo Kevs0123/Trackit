@@ -23,9 +23,13 @@ class TrackItApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fragment = Uri.base.fragment;
+    final initialRoute = fragment.startsWith('/') ? fragment : '/';
+
     return MaterialApp(
       title: 'TrackIt',
       debugShowCheckedModeBanner: false,
+      initialRoute: initialRoute,
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: const Color(0xFF00796B),
@@ -58,7 +62,8 @@ class TrackItApp extends StatelessWidget {
             ),
           );
         }
-        return MaterialPageRoute(settings: settings, builder: (_) => const RootGate());
+        return MaterialPageRoute(
+            settings: settings, builder: (_) => const RootGate());
       },
     );
   }
