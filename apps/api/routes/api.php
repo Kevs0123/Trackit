@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\Route;
 // ---------- Public ----------
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::middleware('throttle:6,1')->group(function () {
+    Route::post('/auth/email/verification-notification', [AuthController::class, 'resendVerification']);
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+});
 
 Route::middleware('throttle:60,1')->group(function () {
     Route::get('/track/{trackingNumber}', [TrackingController::class, 'show']);

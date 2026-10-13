@@ -31,13 +31,33 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> register(String name, String email, String phone, String password) async {
-    final d = await api.post('/auth/register', {
+    await api.post('/auth/register', {
       'name': name,
       'email': email,
       if (phone.isNotEmpty) 'phone': phone,
       'password': password,
     });
-    await _store(d);
+  }
+
+  Future<void> resendVerification(String email) async {
+    await api.post('/auth/email/verification-notification', {'email': email});
+  }
+
+  Future<void> requestPasswordReset(String email) async {
+    await api.post('/auth/forgot-password', {'email': email});
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String email,
+    required String password,
+  }) async {
+    await api.post('/auth/reset-password', {
+      'token': token,
+      'email': email,
+      'password': password,
+      'password_confirmation': password,
+    });
   }
 
   Future<void> _store(dynamic d) async {

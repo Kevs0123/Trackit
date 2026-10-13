@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/admin/admin_home.dart';
 import 'screens/customer/customer_home.dart';
+import 'screens/email_verification_screen.dart';
 import 'screens/landing_screen.dart';
+import 'screens/password_reset_screen.dart';
 import 'screens/rider/rider_home.dart';
 import 'screens/track_screen.dart';
 import 'state/auth_state.dart';
@@ -35,6 +37,25 @@ class TrackItApp extends StatelessWidget {
           return MaterialPageRoute(
             settings: settings,
             builder: (_) => TrackScreen(trackingNumber: uri.pathSegments[1]),
+          );
+        }
+        if (uri.pathSegments.length == 1 &&
+            uri.pathSegments.first == 'verify-email') {
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => EmailVerificationScreen(
+              verified: uri.queryParameters['status'] == 'success',
+            ),
+          );
+        }
+        if (uri.pathSegments.length == 1 &&
+            uri.pathSegments.first == 'reset-password') {
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => PasswordResetScreen(
+              token: uri.queryParameters['token'] ?? '',
+              email: uri.queryParameters['email'] ?? '',
+            ),
           );
         }
         return MaterialPageRoute(settings: settings, builder: (_) => const RootGate());

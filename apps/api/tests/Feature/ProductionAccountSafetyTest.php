@@ -23,7 +23,10 @@ class ProductionAccountSafetyTest extends TestCase
         $demo->createToken('demo');
 
         $this->app['env'] = 'production';
-        $this->seed(DatabaseSeeder::class);
+        $this->artisan('db:seed', [
+            '--class' => DatabaseSeeder::class,
+            '--force' => true,
+        ])->assertExitCode(0);
 
         $this->assertFalse($demo->fresh()->is_active);
         $this->assertDatabaseCount('personal_access_tokens', 0);

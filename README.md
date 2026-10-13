@@ -89,3 +89,24 @@ php artisan trackit:create-admin
 ```
 
 The admin command prompts for a name, email, and a hidden password (minimum 12 characters). Use a unique password and do not paste it into chat or commit it to the repository. Sign in with that account, then add rider accounts from the admin **Riders** tab.
+
+### Email verification and password recovery
+
+Customer registration sends a signed verification link and does not create a login session until the address is verified. Sign-in includes a resend-verification action for unverified customers. The sign-in screen also has a forgot-password flow; reset links return to the Flutter web app and expire after Laravel's configured reset-token lifetime.
+
+Configure these values as Railway service variables (never commit mail credentials):
+
+```text
+APP_URL=https://<your-railway-api-domain>
+FRONTEND_URL=https://trackit-c77df.web.app
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.resend.com
+MAIL_PORT=465
+MAIL_SCHEME=smtps
+MAIL_USERNAME=resend
+MAIL_PASSWORD=<Resend API key>
+MAIL_FROM_ADDRESS=<sender address verified with Resend>
+MAIL_FROM_NAME=TrackIt
+```
+
+Verify a sending domain/address in Resend and use it for `MAIL_FROM_ADDRESS`. Redeploy the API after changing Railway variables. Mail delivery must be configured for registration, verification resend, and password reset emails to work.
