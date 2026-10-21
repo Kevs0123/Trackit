@@ -33,4 +33,12 @@ cd C:\Projects
 .\run-web.ps1
 ```
 
-The script starts Laravel in the background, opens the Flutter web app in Chrome, and stops the API when you exit Flutter. It installs Composer or Flutter dependencies only if they are missing. The client uses `http://127.0.0.1:8000/api` by default.
+The script starts Laravel in the background, opens the Flutter web app in Chrome at `http://localhost:8080`, and stops the API when you exit Flutter. The fixed web port keeps local password-reset links valid. It installs Composer or Flutter dependencies only if they are missing. The client uses `http://127.0.0.1:8000/api` by default.
+
+For production, set `FRONTEND_URL` to the deployed Flutter web app URL so reset emails link back to the deployed client.
+
+## Proof of delivery storage
+
+Riders must submit between one and ten JPG, PNG, WebP, GIF, BMP, or AVIF proof photos (up to 4 MB each) before a parcel can be marked delivered. Proof photos are stored on Laravel's configured `FILESYSTEM_DISK` and are served only to courier staff and the owning customer through authenticated API requests. Recipient names are not collected or shown, and public tracking never exposes proof photos.
+
+Run `php artisan migrate` from `apps/api` after updating the application to add the proof-of-delivery columns. The default local disk is suitable for development. Some production hosts use temporary local storage that can be erased during restarts or redeploys; configure a persistent private S3-compatible disk or Cloudinary-backed storage in production and set `FILESYSTEM_DISK` accordingly. Keep proof images private; do not use a public disk.

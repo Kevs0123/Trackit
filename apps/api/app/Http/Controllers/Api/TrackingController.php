@@ -36,6 +36,9 @@ class TrackingController extends Controller
             'drop_lng' => $parcel->drop_lng,
             'created_at' => $parcel->created_at,
             'delivered_at' => $parcel->delivered_at,
+            'pod_delivered_at' => $parcel->pod_delivered_at,
+            'has_proof' => $parcel->has_proof,
+            'pod_photo_count' => count($parcel->proofPhotoPaths()),
             'rating' => $parcel->rating,
             'feedback' => $parcel->feedback,
             // Rider details (and live location) are only shared while the parcel is on the road

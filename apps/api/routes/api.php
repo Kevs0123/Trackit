@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::middleware('throttle:6,1')->group(function () {
-    Route::post('/auth/email/verification-notification', [AuthController::class, 'resendVerification']);
     Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 });
@@ -31,6 +30,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/parcels/mine', [ParcelController::class, 'mine']);
     Route::post('/parcels', [ParcelController::class, 'store']);
     Route::get('/parcels/{parcel}', [ParcelController::class, 'show'])->whereNumber('parcel');
+    Route::get('/parcels/{parcel}/proof', [ParcelController::class, 'showProof'])->whereNumber('parcel');
+    Route::get('/parcels/{parcel}/proof/{photo}', [ParcelController::class, 'showProof'])
+        ->whereNumber('parcel')
+        ->whereNumber('photo');
+    Route::post('/parcels/{parcel}/proof', [ParcelController::class, 'storeProof'])->whereNumber('parcel');
     Route::post('/parcels/{parcel}/status', [ParcelController::class, 'updateStatus'])->whereNumber('parcel');
     Route::post('/parcels/{parcel}/cancel', [ParcelController::class, 'cancel'])->whereNumber('parcel');
 
@@ -61,4 +65,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/rider/parcels', [RiderController::class, 'myParcels']);
         Route::post('/rider/location', [RiderController::class, 'updateLocation']);
     });
+
+    Route::get('/track/{trackingNumber}/proof', [ParcelController::class, 'showProofByTrackingNumber']);
+    Route::get('/track/{trackingNumber}/proof/{photo}', [ParcelController::class, 'showProofByTrackingNumber'])
+        ->whereNumber('photo');
 });

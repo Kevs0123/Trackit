@@ -63,13 +63,15 @@ class _ParcelsPageState extends State<ParcelsPage> {
       builder: (_) => const ParcelFormDialog(isStaff: true),
     );
     if (created != null && mounted) {
-      showSnack(context, 'Parcel booked. Tracking number: ${created.trackingNumber}');
+      showSnack(
+          context, 'Parcel booked. Tracking number: ${created.trackingNumber}');
       _applyFilters();
     }
   }
 
   Future<void> _assign(Parcel p) async {
-    final ok = await showDialog<bool>(context: context, builder: (_) => AssignRiderDialog(parcel: p));
+    final ok = await showDialog<bool>(
+        context: context, builder: (_) => AssignRiderDialog(parcel: p));
     if (ok == true && mounted) {
       showSnack(context, 'Rider assigned and customer notified.');
       _load();
@@ -81,16 +83,22 @@ class _ParcelsPageState extends State<ParcelsPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Cancel parcel?'),
-        content: Text('${p.trackingNumber} will be marked as cancelled and the customer will be notified.'),
+        content: Text(
+            '${p.trackingNumber} will be marked as cancelled and the customer will be notified.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancel parcel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Cancel parcel')),
         ],
       ),
     );
     if (sure != true || !mounted) return;
     try {
-      await context.read<AuthState>().api.post('/parcels/${p.id}/status', {'status': 'cancelled', 'note': 'Cancelled by staff.'});
+      await context.read<AuthState>().api.post('/parcels/${p.id}/status',
+          {'status': 'cancelled', 'note': 'Cancelled by staff.'});
       if (mounted) _load();
     } catch (e) {
       if (mounted) showSnack(context, errText(e), error: true);
@@ -107,46 +115,60 @@ class _ParcelsPageState extends State<ParcelsPage> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                SizedBox(
-                  width: 280,
-                  child: TextField(
-                    controller: _search,
-                    onSubmitted: (_) => _applyFilters(),
-                    decoration: InputDecoration(
-                      hintText: 'Search tracking no. or name',
-                      isDense: true,
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: IconButton(icon: const Icon(Icons.arrow_forward), onPressed: _applyFilters),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final searchWidth =
+                  constraints.maxWidth < 320 ? constraints.maxWidth : 280.0;
+              final statusWidth =
+                  constraints.maxWidth < 240 ? constraints.maxWidth : 200.0;
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: searchWidth,
+                      child: TextField(
+                        controller: _search,
+                        onSubmitted: (_) => _applyFilters(),
+                        decoration: InputDecoration(
+                          hintText: 'Search tracking no. or name',
+                          isDense: true,
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: IconButton(
+                            tooltip: 'Search',
+                            icon: const Icon(Icons.arrow_forward),
+                            onPressed: _applyFilters,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    SizedBox(
+                      width: statusWidth,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _status,
+                        isDense: true,
+                        decoration: const InputDecoration(labelText: 'Status'),
+                        items: [
+                          const DropdownMenuItem(
+                              value: '', child: Text('All statuses')),
+                          for (final e in statusLabels.entries)
+                            DropdownMenuItem(
+                                value: e.key, child: Text(e.value)),
+                        ],
+                        onChanged: (v) {
+                          _status = v ?? '';
+                          _applyFilters();
+                        },
+                      ),
+                    ),
+                    Text('$_total parcels'),
+                  ],
                 ),
-                SizedBox(
-                  width: 200,
-                  child: DropdownButtonFormField<String>(
-                    value: _status,
-                    isDense: true,
-                    decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Status'),
-                    items: [
-                      const DropdownMenuItem(value: '', child: Text('All statuses')),
-                      for (final e in statusLabels.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
-                    ],
-                    onChanged: (v) {
-                      _status = v ?? '';
-                      _applyFilters();
-                    },
-                  ),
-                ),
-                Text('$_total parcels'),
-              ],
-            ),
+              );
+            },
           ),
           Expanded(
             child: _loading
@@ -167,12 +189,22 @@ class _ParcelsPageState extends State<ParcelsPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
-                    onPressed: _page > 1 ? () { _page--; _load(); } : null,
+                    onPressed: _page > 1
+                        ? () {
+                            _page--;
+                            _load();
+                          }
+                        : null,
                     icon: const Icon(Icons.chevron_left),
                   ),
                   Text('Page $_page of $_lastPage'),
                   IconButton(
-                    onPressed: _page < _lastPage ? () { _page++; _load(); } : null,
+                    onPressed: _page < _lastPage
+                        ? () {
+                            _page++;
+                            _load();
+                          }
+                        : null,
                     icon: const Icon(Icons.chevron_right),
                   ),
                 ],
@@ -184,12 +216,15 @@ class _ParcelsPageState extends State<ParcelsPage> {
   }
 
   Widget _row(Parcel p) {
-    final canAssign = p.status == 'booked' || p.status == 'assigned' || p.status == 'failed';
+    final canAssign =
+        p.status == 'booked' || p.status == 'assigned' || p.status == 'failed';
     return Card(
       child: ListTile(
         onTap: () => Navigator.pushNamed(context, '/track/${p.trackingNumber}'),
         title: Row(children: [
-          Flexible(child: Text(p.trackingNumber, style: const TextStyle(fontWeight: FontWeight.bold))),
+          Flexible(
+              child: Text(p.trackingNumber,
+                  style: const TextStyle(fontWeight: FontWeight.bold))),
           const SizedBox(width: 10),
           StatusChip(p.status),
         ]),
@@ -200,14 +235,26 @@ class _ParcelsPageState extends State<ParcelsPage> {
         isThreeLine: true,
         trailing: PopupMenuButton<String>(
           onSelected: (v) {
-            if (v == 'track') Navigator.pushNamed(context, '/track/${p.trackingNumber}');
-            if (v == 'assign') _assign(p);
-            if (v == 'cancel') _cancel(p);
+            if (v == 'track') {
+              Navigator.pushNamed(context, '/track/${p.trackingNumber}');
+            }
+            if (v == 'assign') {
+              _assign(p);
+            }
+            if (v == 'cancel') {
+              _cancel(p);
+            }
           },
           itemBuilder: (_) => [
             const PopupMenuItem(value: 'track', child: Text('View tracking')),
-            if (canAssign) PopupMenuItem(value: 'assign', child: Text(p.riderName == null ? 'Assign rider' : 'Reassign rider')),
-            if (!p.isFinal) const PopupMenuItem(value: 'cancel', child: Text('Cancel parcel')),
+            if (canAssign)
+              PopupMenuItem(
+                  value: 'assign',
+                  child: Text(
+                      p.riderName == null ? 'Assign rider' : 'Reassign rider')),
+            if (!p.isFinal)
+              const PopupMenuItem(
+                  value: 'cancel', child: Text('Cancel parcel')),
           ],
         ),
       ),

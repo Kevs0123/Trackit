@@ -19,6 +19,7 @@
 
 # Flutter/Dart generated files
 **/.dart_tool/
+**/.firebase/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
 **/.pub-cache/

@@ -7,6 +7,8 @@ use App\Models\Parcel;
 use App\Models\User;
 use App\Services\ParcelService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ParcelController extends Controller
 {
@@ -55,7 +57,7 @@ class ParcelController extends Controller
         $user = $request->user();
         abort_if($user->role === 'rider', 403, 'Riders cannot book parcels.');
 
-        $data = $request->validate([
+        $request->validate([
             'sender_name' => 'required|string|max:100',
             'sender_phone' => 'required|string|max:30',
             'sender_email' => 'nullable|email|max:255',
@@ -86,6 +88,86 @@ class ParcelController extends Controller
         abort_unless($this->canView($request->user(), $parcel), 403, 'You cannot view this parcel.');
 
         return $parcel->load(['events', 'rider:id,name,phone', 'customer:id,name,email']);
+    }
+
+    /** Rider assigned to this parcel submits its proof before marking delivery complete. */
+    public function storeProof(Request $request, Parcel $parcel)
+    {
+        $user = $request->user();
+        abort_unless(
+            $user->role === 'rider' && (int) $parcel->rider_id === (int) $user->id,
+            403,
+            'Only the rider assigned to this parcel can submit proof of delivery.'
+        );
+        abort_unless($parcel->status === 'out_for_delivery', 422, 'Proof can only be submitted for an out-for-delivery parcel.');
+
+        $request->validate([
+            'photos' => 'required|array|min:1|max:10',
+            'photos.*' => 'required|image|mimes:jpg,jpeg,png,webp,gif,bmp,avif|max:4096',
+        ]);
+
+        $diskName = $this->privateDiskName();
+        $disk = Storage::disk($diskName);
+        $paths = [];
+        try {
+            foreach ($request->file('photos') as $photo) {
+                $path = $disk->putFileAs(
+                    "proof-of-delivery/{$parcel->id}",
+                    $photo,
+                    Str::uuid().'.'.$photo->extension(),
+                    ['visibility' => 'private'],
+                );
+                if (! is_string($path) || $path === '') {
+                    throw new \RuntimeException("Could not store proof of delivery on the [{$diskName}] disk.");
+                }
+                $paths[] = $path;
+            }
+        } catch (\Throwable $exception) {
+            if ($paths !== []) {
+                $disk->delete($paths);
+            }
+            throw $exception;
+        }
+
+        $previousPaths = $parcel->proofPhotoPaths();
+        try {
+            $parcel->update([
+                'pod_photo_path' => $paths[0],
+                'pod_photo_paths' => $paths,
+                'pod_delivered_at' => now(),
+            ]);
+        } catch (\Throwable $exception) {
+            $disk->delete($paths);
+            throw $exception;
+        }
+
+        $obsoletePaths = array_values(array_diff($previousPaths, $paths));
+        if ($obsoletePaths !== []) {
+            $disk->delete($obsoletePaths);
+        }
+
+        return response()->json([
+            'message' => 'Proof of delivery saved.',
+            'photo_count' => count($paths),
+            'delivered_at' => $parcel->pod_delivered_at,
+        ]);
+    }
+
+    /** Only staff, the assigned rider, and matching sender or receiver accounts can view proof. */
+    public function showProof(Request $request, Parcel $parcel, int $photo = 0)
+    {
+        abort_unless($this->canViewProof($request->user(), $parcel), 403, 'You cannot view this proof of delivery.');
+
+        return $this->proofResponse($parcel, $photo);
+    }
+
+    /** Tracking page companion to the authenticated parcel proof endpoint. */
+    public function showProofByTrackingNumber(Request $request, string $trackingNumber, int $photo = 0)
+    {
+        $parcel = Parcel::where('tracking_number', strtoupper(trim($trackingNumber)))->firstOrFail();
+        abort_unless($this->canViewProof($request->user(), $parcel), 403, 'You cannot view this proof of delivery.');
+
+        return $this->proofResponse($parcel, $photo);
     }
 
     /** Staff: assign (or reassign) a rider */
@@ -153,7 +235,68 @@ class ParcelController extends Controller
         return match ($user->role) {
             'admin' => true,
             'rider' => (int) $parcel->rider_id === (int) $user->id,
-            default => (int) $parcel->customer_id === (int) $user->id || ($parcel->sender_email && $parcel->sender_email === $user->email),
+            'customer' => (int) $parcel->customer_id === (int) $user->id || ($parcel->sender_email && $parcel->sender_email === $user->email),
+            default => false,
         };
+    }
+
+    private function proofResponse(Parcel $parcel, int $photo)
+    {
+        $paths = $parcel->proofPhotoPaths();
+        abort_unless(isset($paths[$photo]), 404, 'Proof of delivery photo was not found.');
+
+        $disk = Storage::disk($this->privateDiskName());
+        $path = $paths[$photo];
+        $stream = $disk->readStream($path);
+        abort_if($stream === false, 404, 'Proof of delivery image was not found.');
+
+        $mimeType = $disk->mimeType($path);
+
+        return response()->stream(function () use ($stream) {
+            try {
+                fpassthru($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => $mimeType ?: 'application/octet-stream',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Disposition' => 'inline; filename="proof-of-delivery"',
+        ]);
+    }
+
+    private function canViewProof(User $user, Parcel $parcel): bool
+    {
+        return $user->role === 'admin'
+            || ($user->role === 'rider' && (int) $parcel->rider_id === (int) $user->id)
+            || ($user->role === 'customer'
+                && ((int) $parcel->customer_id === (int) $user->id
+                    || ($parcel->sender_email && $parcel->sender_email === $user->email)
+                    || ($parcel->receiver_email && $parcel->receiver_email === $user->email)));
+    }
+
+    private function privateDiskName(): string
+    {
+        $diskName = (string) config('filesystems.default');
+        $diskConfig = config("filesystems.disks.{$diskName}", []);
+        $root = $diskConfig['root'] ?? null;
+        $publicRoot = realpath(public_path());
+        $resolvedRoot = $root ? realpath($root) : false;
+        $isPublicLocalRoot = ($diskConfig['driver'] ?? null) === 'local'
+            && $resolvedRoot
+            && $publicRoot
+            && str_starts_with(
+                strtolower($resolvedRoot.DIRECTORY_SEPARATOR),
+                strtolower($publicRoot.DIRECTORY_SEPARATOR)
+            );
+
+        abort_if(
+            ($diskConfig['visibility'] ?? 'private') === 'public' || $isPublicLocalRoot,
+            500,
+            'Proof-of-delivery storage must use a private disk. Configure FILESYSTEM_DISK to a private local or cloud disk.'
+        );
+
+        return $diskName;
     }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/api.dart';
 import '../state/auth_state.dart';
 import '../utils.dart';
 
@@ -23,9 +22,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _hide = true;
   bool _forgotPassword = false;
   bool _resetSent = false;
-  bool _canResendVerification = false;
-  String? _verificationEmail;
   String? _notice;
+  String? _resetUrl;
   String? _error;
 
   final _emailRegex = RegExp(
@@ -47,21 +45,15 @@ class _LoginScreenState extends State<LoginScreen> {
           _phone.text.trim(),
           _password.text,
         );
-        if (mounted) {
-          setState(() {
-            _verificationEmail = _email.text.trim();
-            _password.clear();
-            _notice = 'A verification link has been sent to $_verificationEmail.';
-          });
-        }
-        return;
       } else if (_forgotPassword) {
-        await auth.requestPasswordReset(_email.text.trim());
+        final resetUrl = await auth.requestPasswordReset(_email.text.trim());
         if (mounted) {
           setState(() {
             _resetSent = true;
-            _notice =
-                'If an account exists for this email, a password reset link has been sent.';
+            _resetUrl = resetUrl;
+            _notice = resetUrl == null
+                ? 'If an account exists for this email, a password reset link has been sent.'
+                : 'Local development reset link is ready.';
           });
         }
         return;
@@ -70,14 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = errText(e);
-          _canResendVerification = e is ApiException &&
-              e.status == 403 &&
-              e.message.toLowerCase().contains('verify your email');
-        });
-      }
+      if (mounted) setState(() => _error = errText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -103,29 +88,6 @@ class _LoginScreenState extends State<LoginScreen> {
     return null;
   }
 
-  Future<void> _resendVerification() async {
-    final email = _verificationEmail ?? _email.text.trim();
-    if (email.isEmpty) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await context.read<AuthState>().resendVerification(email);
-      if (mounted) {
-        setState(() {
-          _notice =
-              'If an unverified account exists for $email, a verification link has been sent.';
-          _canResendVerification = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _error = errText(e));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   String? _validatePhone(String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return null;
@@ -139,9 +101,8 @@ class _LoginScreenState extends State<LoginScreen> {
       _register = !_register;
       _forgotPassword = false;
       _resetSent = false;
-      _verificationEmail = null;
-      _canResendVerification = false;
       _notice = null;
+      _resetUrl = null;
       _error = null;
       _password.clear();
       if (!_register) {
@@ -155,15 +116,11 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _verificationEmail != null
-              ? 'Verify your email'
-              : _forgotPassword
-                  ? 'Reset password'
-                  : _register
-                      ? 'Create customer account'
-                      : 'Sign in',
-        ),
+        title: Text(_forgotPassword
+            ? 'Reset password'
+            : _register
+                ? 'Create customer account'
+                : 'Sign in'),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -176,38 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                      if (_verificationEmail != null) ...[
-                        const Icon(Icons.mark_email_unread_outlined, size: 56),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Check your inbox at $_verificationEmail and open the verification link before signing in.',
-                          textAlign: TextAlign.center,
-                        ),
-                        if (_notice != null) ...[
-                          const SizedBox(height: 12),
-                          Text(_notice!, textAlign: TextAlign.center),
-                        ],
-                        if (_error != null) ...[
-                          const SizedBox(height: 12),
-                          Text(_error!, style: TextStyle(color: Colors.red.shade700)),
-                        ],
-                        const SizedBox(height: 12),
-                        OutlinedButton(
-                          onPressed: _busy ? null : _resendVerification,
-                          child: const Text('Resend verification email'),
-                        ),
-                        TextButton(
-                          onPressed: _busy
-                              ? null
-                              : () => setState(() {
-                                    _verificationEmail = null;
-                                    _notice = null;
-                                    _error = null;
-                                  }),
-                          child: const Text('Back to sign in'),
-                        ),
-                      ] else ...[
-                      if (_register) ...[
+                    if (_register) ...[
                       TextFormField(
                         controller: _name,
                         textCapitalization: TextCapitalization.words,
@@ -269,6 +195,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.only(top: 12),
                         child: Text(_notice!, textAlign: TextAlign.center),
                       ),
+                    if (_resetUrl != null)
+                      TextButton(
+                        onPressed: () {
+                          final route = Uri.parse(_resetUrl!).fragment;
+                          Navigator.of(context).pushNamed(route);
+                        },
+                        child: const Text('Open password reset page'),
+                      ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),
                       Align(
@@ -322,7 +256,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   _resetSent = false;
                                   _error = null;
                                   _notice = null;
-                                  _canResendVerification = false;
+                                  _resetUrl = null;
                                 }),
                         child: const Text('Forgot password?'),
                       ),
@@ -338,12 +272,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 }),
                         child: const Text('Back to sign in'),
                       ),
-                    if (_canResendVerification)
-                      TextButton(
-                        onPressed: _busy ? null : _resendVerification,
-                        child: const Text('Resend verification email'),
-                      ),
-                    ],
                   ],
                 ),
               ),

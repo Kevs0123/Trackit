@@ -5,6 +5,7 @@ import '../../state/auth_state.dart';
 import '../../utils.dart';
 import '../../utils/download.dart';
 import '../../widgets/stat_card.dart';
+import '../../widgets/stat_grid.dart';
 
 /// Delivery reports + efficiency (success rate, delivery time) and usability (customer ratings).
 class ReportsPage extends StatefulWidget {
@@ -29,16 +30,22 @@ class _ReportsPageState extends State<ReportsPage> {
     _load();
   }
 
-  Map<String, String> get _query => {'from': _fmt.format(_from), 'to': _fmt.format(_to)};
+  Map<String, String> get _query =>
+      {'from': _fmt.format(_from), 'to': _fmt.format(_to)};
 
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final d = await context.read<AuthState>().api.get('/reports/deliveries', query: _query);
-      if (mounted) setState(() {
-        _d = Map<String, dynamic>.from(d);
-        _error = null;
-      });
+      final d = await context
+          .read<AuthState>()
+          .api
+          .get('/reports/deliveries', query: _query);
+      if (mounted) {
+        setState(() {
+          _d = Map<String, dynamic>.from(d);
+          _error = null;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = errText(e));
     } finally {
@@ -60,8 +67,13 @@ class _ReportsPageState extends State<ReportsPage> {
 
   Future<void> _export() async {
     try {
-      final csv = await context.read<AuthState>().api.getText('/reports/export', query: _query);
-      downloadTextFile('trackit-report-${_fmt.format(_from)}-to-${_fmt.format(_to)}.csv', csv);
+      final csv = await context
+          .read<AuthState>()
+          .api
+          .getText('/reports/export', query: _query);
+      downloadTextFile(
+          'trackit-report-${_fmt.format(_from)}-to-${_fmt.format(_to)}.csv',
+          csv);
     } catch (e) {
       if (mounted) showSnack(context, errText(e), error: true);
     }
@@ -96,7 +108,10 @@ class _ReportsPageState extends State<ReportsPage> {
               icon: const Icon(Icons.date_range),
               label: Text('To ${_fmt.format(_to)}'),
             ),
-            FilledButton.icon(onPressed: _export, icon: const Icon(Icons.download), label: const Text('Export CSV')),
+            FilledButton.icon(
+                onPressed: _export,
+                icon: const Icon(Icons.download),
+                label: const Text('Export CSV')),
           ],
         ),
         const SizedBox(height: 16),
@@ -105,28 +120,59 @@ class _ReportsPageState extends State<ReportsPage> {
         else if (_error != null)
           Text(_error!)
         else if (d != null) ...[
-          Wrap(
-            spacing: 12,
-            runSpacing: 4,
+          StatGrid(
             children: [
-              StatCard(icon: Icons.inventory_2, label: 'Parcels booked', value: '${d['total_booked']}'),
-              StatCard(icon: Icons.check_circle, label: 'Delivered', value: '${d['delivered']}', color: Colors.green),
-              StatCard(icon: Icons.error_outline, label: 'Failed', value: '${d['failed']}', color: Colors.red),
-              StatCard(icon: Icons.cancel_outlined, label: 'Cancelled', value: '${d['cancelled']}', color: Colors.grey),
-              StatCard(icon: Icons.percent, label: 'Delivery success rate', value: _pct(d['success_rate']), color: Colors.teal),
-              StatCard(icon: Icons.timer_outlined, label: 'Avg. delivery time', value: _duration(d['avg_delivery_minutes']), color: Colors.indigo),
+              StatCard(
+                  icon: Icons.inventory_2,
+                  label: 'Parcels booked',
+                  value: '${d['total_booked']}'),
+              StatCard(
+                  icon: Icons.check_circle,
+                  label: 'Delivered',
+                  value: '${d['delivered']}',
+                  color: Colors.green),
+              StatCard(
+                  icon: Icons.error_outline,
+                  label: 'Failed',
+                  value: '${d['failed']}',
+                  color: Colors.red),
+              StatCard(
+                  icon: Icons.cancel_outlined,
+                  label: 'Cancelled',
+                  value: '${d['cancelled']}',
+                  color: Colors.grey),
+              StatCard(
+                  icon: Icons.percent,
+                  label: 'Delivery success rate',
+                  value: _pct(d['success_rate']),
+                  color: Colors.teal),
+              StatCard(
+                  icon: Icons.timer_outlined,
+                  label: 'Avg. delivery time',
+                  value: _duration(d['avg_delivery_minutes']),
+                  color: Colors.indigo),
               StatCard(
                 icon: Icons.star,
                 label: 'Avg. customer rating (${d['ratings_count']})',
-                value: d['avg_rating'] == null ? 'n/a' : '${d['avg_rating']} / 5',
+                value:
+                    d['avg_rating'] == null ? 'n/a' : '${d['avg_rating']} / 5',
                 color: Colors.amber.shade800,
               ),
-              StatCard(icon: Icons.notifications_active, label: 'Notifications sent', value: '${d['notifications_sent']}', color: Colors.deepPurple),
-              StatCard(icon: Icons.payments_outlined, label: 'Total fees', value: money(d['total_fees'] as num?), color: Colors.green.shade800),
+              StatCard(
+                  icon: Icons.notifications_active,
+                  label: 'Notifications sent',
+                  value: '${d['notifications_sent']}',
+                  color: Colors.deepPurple),
+              StatCard(
+                  icon: Icons.payments_outlined,
+                  label: 'Total fees',
+                  value: money(d['total_fees'] as num?),
+                  color: Colors.green.shade800),
             ],
           ),
           const SizedBox(height: 20),
-          const Text('Performance by rider', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('Performance by rider',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -153,7 +199,8 @@ class _ReportsPageState extends State<ReportsPage> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text('Daily bookings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('Daily bookings',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,

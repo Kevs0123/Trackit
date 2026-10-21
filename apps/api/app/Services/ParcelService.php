@@ -7,6 +7,7 @@ use App\Models\ParcelEvent;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -64,6 +65,7 @@ class ParcelService
         }
         $this->guardNotFinal($parcel);
 
+        $previousProofPaths = $parcel->proofPhotoPaths();
         DB::transaction(function () use ($parcel, $rider, $by) {
             $parcel->update([
                 'rider_id' => $rider->id,
@@ -71,9 +73,16 @@ class ParcelService
                 'assigned_at' => now(),
                 'route_order' => null,
                 'route_distance_km' => null,
+                'pod_photo_path' => null,
+                'pod_photo_paths' => null,
+                'pod_delivered_at' => null,
             ]);
             $this->logEvent($parcel, 'assigned', "Assigned to rider {$rider->name}.", null, null, $by);
         });
+
+        if ($previousProofPaths !== []) {
+            Storage::disk(config('filesystems.default'))->delete($previousProofPaths);
+        }
 
         $this->notifier->parcelStatus($parcel, "Rider: {$rider->name}");
 
@@ -82,7 +91,24 @@ class ParcelService
 
     public function changeStatus(Parcel $parcel, string $status, ?string $note, ?float $lat, ?float $lng, ?User $by): Parcel
     {
+        $parcel->refresh();
         $this->guardNotFinal($parcel);
+
+        $proofPaths = $parcel->proofPhotoPaths();
+        if ($status === 'delivered' && (
+            $proofPaths === []
+            || ! $parcel->pod_delivered_at
+            || count(array_filter(
+                $proofPaths,
+                fn ($path) => Storage::disk(config('filesystems.default'))->exists($path),
+            )) !== count($proofPaths)
+        )) {
+            throw ValidationException::withMessages([
+                'status' => [
+                    'Delivery not completed. Upload at least one supported proof photo (maximum 4 MB each) first.',
+                ],
+            ]);
+        }
 
         DB::transaction(function () use ($parcel, $status, $note, $lat, $lng, $by) {
             $parcel->status = $status;

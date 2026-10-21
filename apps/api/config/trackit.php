@@ -2,7 +2,11 @@
 
 return [
     // Used in notification emails so customers can open the tracking page
-    'frontend_url' => env('FRONTEND_URL', 'http://localhost:8080'),
+    'frontend_url' => env('FRONTEND_URL') ?: (
+        env('APP_ENV') === 'production'
+            ? env('APP_URL', 'http://localhost')
+            : 'http://localhost:8080'
+    ),
 
     // Address -> coordinates lookup (OpenStreetMap Nominatim, free, no API key)
     'geocode_enabled' => env('GEOCODE_ENABLED', true),

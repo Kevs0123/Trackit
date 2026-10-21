@@ -42,7 +42,8 @@ Color statusColor(String s) {
 
 double? _d(dynamic v) => v == null ? null : double.tryParse(v.toString());
 int? _i(dynamic v) => v == null ? null : int.tryParse(v.toString());
-DateTime? _dt(dynamic v) => v == null ? null : DateTime.tryParse(v.toString())?.toLocal();
+DateTime? _dt(dynamic v) =>
+    v == null ? null : DateTime.tryParse(v.toString())?.toLocal();
 
 class AppUser {
   final int id;
@@ -69,7 +70,9 @@ class AppUser {
         email: j['email']?.toString() ?? '',
         role: j['role']?.toString() ?? 'customer',
         phone: j['phone']?.toString(),
-        isActive: j['is_active'] == null ? true : (j['is_active'] == true || j['is_active'] == 1),
+        isActive: j['is_active'] == null
+            ? true
+            : (j['is_active'] == true || j['is_active'] == 1),
         activeParcels: _i(j['active_parcels']) ?? 0,
       );
 }
@@ -80,11 +83,16 @@ class ParcelEvent {
   final String? note;
   final DateTime? createdAt;
 
-  ParcelEvent({required this.status, required this.statusLabel, this.note, this.createdAt});
+  ParcelEvent(
+      {required this.status,
+      required this.statusLabel,
+      this.note,
+      this.createdAt});
 
   factory ParcelEvent.fromJson(Map<String, dynamic> j) => ParcelEvent(
         status: j['status']?.toString() ?? '',
-        statusLabel: j['status_label']?.toString() ?? statusLabels[j['status']] ?? '',
+        statusLabel:
+            j['status_label']?.toString() ?? statusLabels[j['status']] ?? '',
         note: j['note']?.toString(),
         createdAt: _dt(j['created_at']),
       );
@@ -119,6 +127,9 @@ class Parcel {
   final String? mapsUrl;
   final DateTime? createdAt;
   final DateTime? deliveredAt;
+  final DateTime? podDeliveredAt;
+  final bool hasProof;
+  final int podPhotoCount;
   final int? rating;
   final String? feedback;
   final List<ParcelEvent> events;
@@ -152,6 +163,9 @@ class Parcel {
     this.mapsUrl,
     this.createdAt,
     this.deliveredAt,
+    this.podDeliveredAt,
+    this.hasProof = false,
+    this.podPhotoCount = 0,
     this.rating,
     this.feedback,
     this.events = const [],
@@ -159,7 +173,8 @@ class Parcel {
 
   /// Works for the full parcel JSON (staff/customer/rider) and the public tracking JSON.
   factory Parcel.fromJson(Map<String, dynamic> j) {
-    final rider = j['rider'] is Map ? Map<String, dynamic>.from(j['rider']) : null;
+    final rider =
+        j['rider'] is Map ? Map<String, dynamic>.from(j['rider']) : null;
     final events = (j['events'] as List? ?? [])
         .map((e) => ParcelEvent.fromJson(Map<String, dynamic>.from(e)))
         .toList();
@@ -169,7 +184,8 @@ class Parcel {
       id: _i(j['id']) ?? 0,
       trackingNumber: j['tracking_number']?.toString() ?? '',
       status: status,
-      statusLabel: j['status_label']?.toString() ?? statusLabels[status] ?? status,
+      statusLabel:
+          j['status_label']?.toString() ?? statusLabels[status] ?? status,
       senderName: j['sender_name']?.toString() ?? '',
       senderPhone: j['sender_phone']?.toString() ?? '',
       pickupAddress: j['pickup_address']?.toString() ?? '',
@@ -194,6 +210,10 @@ class Parcel {
       mapsUrl: j['maps_url']?.toString(),
       createdAt: _dt(j['created_at']),
       deliveredAt: _dt(j['delivered_at']),
+      podDeliveredAt: _dt(j['pod_delivered_at']),
+      hasProof: j['has_proof'] == true || j['has_proof'] == 1,
+      podPhotoCount: _i(j['pod_photo_count']) ??
+          (j['has_proof'] == true || j['has_proof'] == 1 ? 1 : 0),
       rating: _i(j['rating']),
       feedback: j['feedback']?.toString(),
       events: events,
@@ -203,5 +223,6 @@ class Parcel {
   bool get isFinal => status == 'delivered' || status == 'cancelled';
 }
 
-List<Parcel> parseParcels(dynamic list) =>
-    (list as List? ?? []).map((e) => Parcel.fromJson(Map<String, dynamic>.from(e))).toList();
+List<Parcel> parseParcels(dynamic list) => (list as List? ?? [])
+    .map((e) => Parcel.fromJson(Map<String, dynamic>.from(e)))
+    .toList();

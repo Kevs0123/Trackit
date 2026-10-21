@@ -5,6 +5,7 @@ $apiPath = Join-Path $repoRoot 'apps/api'
 $mobilePath = Join-Path $repoRoot 'apps/mobile'
 $apiProcess = $null
 $apiPort = 8000
+$webPort = 8080
 
 function Test-LocalPort {
   param([int]$Port)
@@ -31,6 +32,9 @@ try {
   }
   if (Test-LocalPort -Port $apiPort) {
     throw "Port $apiPort is already in use. Stop the existing service, then rerun this script."
+  }
+  if (Test-LocalPort -Port $webPort) {
+    throw "Port $webPort is already in use. Stop the existing service, then rerun this script."
   }
 
   if (-not (Test-Path (Join-Path $apiPath 'vendor/autoload.php'))) {
@@ -83,10 +87,35 @@ try {
     Start-Sleep -Milliseconds 300
   }
 
+  $healthUrl = "http://127.0.0.1:$apiPort/up"
+  $apiReady = $false
+  $lastHealthError = 'The API health endpoint has not responded yet.'
+  while (-not $apiReady) {
+    if ($apiProcess.HasExited) {
+      $details = if (Test-Path $stderrLog) { Get-Content $stderrLog -Tail 20 | Out-String } else { '' }
+      throw "The API server stopped before becoming ready. Check $stderrLog`n$details"
+    }
+
+    try {
+      $health = Invoke-WebRequest -Uri $healthUrl -TimeoutSec 2 -UseBasicParsing
+      $apiReady = $health.StatusCode -eq 200
+      if (-not $apiReady) {
+        $lastHealthError = "Unexpected response from $healthUrl (HTTP $($health.StatusCode))."
+      }
+    } catch {
+      $lastHealthError = $_.Exception.Message
+    }
+
+    if (-not $apiReady -and (Get-Date) -ge $startupDeadline) {
+      throw "The API did not become healthy within 30 seconds. $lastHealthError Check $stderrLog."
+    }
+    if (-not $apiReady) { Start-Sleep -Milliseconds 300 }
+  }
+
   Write-Host 'API is ready. Starting the web app in Chrome. Press Ctrl+C to stop both.'
   Push-Location $mobilePath
   try {
-    & flutter run -d chrome
+    & flutter run -d chrome "--web-port=$webPort"
     $flutterExitCode = $LASTEXITCODE
   } finally {
     Pop-Location

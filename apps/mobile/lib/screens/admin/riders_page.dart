@@ -28,7 +28,9 @@ class _RidersPageState extends State<RidersPage> {
       final d = await context.read<AuthState>().api.get('/riders');
       if (!mounted) return;
       setState(() {
-        _riders = (d as List).map((e) => AppUser.fromJson(Map<String, dynamic>.from(e))).toList();
+        _riders = (d as List)
+            .map((e) => AppUser.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
         _error = null;
       });
     } catch (e) {
@@ -40,7 +42,10 @@ class _RidersPageState extends State<RidersPage> {
 
   Future<void> _toggle(AppUser r, bool active) async {
     try {
-      await context.read<AuthState>().api.put('/riders/${r.id}', {'is_active': active});
+      await context
+          .read<AuthState>()
+          .api
+          .put('/riders/${r.id}', {'is_active': active});
       _load();
     } catch (e) {
       if (mounted) showSnack(context, errText(e), error: true);
@@ -65,16 +70,28 @@ class _RidersPageState extends State<RidersPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: name, decoration: const InputDecoration(labelText: 'Full name', border: OutlineInputBorder())),
+                TextField(
+                    controller: name,
+                    decoration: const InputDecoration(
+                        labelText: 'Full name', border: OutlineInputBorder())),
                 const SizedBox(height: 10),
-                TextField(controller: email, decoration: const InputDecoration(labelText: 'Email (login)', border: OutlineInputBorder())),
+                TextField(
+                    controller: email,
+                    decoration: const InputDecoration(
+                        labelText: 'Email (login)',
+                        border: OutlineInputBorder())),
                 const SizedBox(height: 10),
-                TextField(controller: phone, decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder())),
+                TextField(
+                    controller: phone,
+                    decoration: const InputDecoration(
+                        labelText: 'Phone', border: OutlineInputBorder())),
                 const SizedBox(height: 10),
                 TextField(
                   controller: password,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password (min 6)', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                      labelText: 'Password (min 8)',
+                      border: OutlineInputBorder()),
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 8),
@@ -84,7 +101,9 @@ class _RidersPageState extends State<RidersPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel')),
             FilledButton(
               onPressed: busy
                   ? null
@@ -94,13 +113,19 @@ class _RidersPageState extends State<RidersPage> {
                         error = null;
                       });
                       try {
-                        await this.context.read<AuthState>().api.post('/riders', {
+                        await this
+                            .context
+                            .read<AuthState>()
+                            .api
+                            .post('/riders', {
                           'name': name.text.trim(),
                           'email': email.text.trim(),
                           'phone': phone.text.trim(),
                           'password': password.text,
                         });
-                        if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
                       } catch (e) {
                         setS(() {
                           busy = false;
@@ -131,34 +156,74 @@ class _RidersPageState extends State<RidersPage> {
           : _error != null
               ? Center(child: Text(_error!))
               : _riders.isEmpty
-                  ? const Center(child: Text('No riders yet. Add your first rider.'))
+                  ? const Center(
+                      child: Text('No riders yet. Add your first rider.'))
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
                       children: [
                         for (final r in _riders)
                           Card(
-                            child: ListTile(
-                              leading: CircleAvatar(child: Text(r.name.isEmpty ? '?' : r.name[0].toUpperCase())),
-                              title: Text(r.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text('${r.email}  •  ${r.phone ?? 'no phone'}\n${r.activeParcels} active deliveries'),
-                              isThreeLine: true,
-                              trailing: Wrap(
-                                spacing: 8,
-                                crossAxisAlignment: WrapCrossAlignment.center,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  OutlinedButton.icon(
-                                    onPressed: r.activeParcels == 0
-                                        ? null
-                                        : () async {
-                                            await showRouteDialog(context, riderId: r.id);
-                                            _load();
-                                          },
-                                    icon: const Icon(Icons.route),
-                                    label: const Text('Optimize route'),
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        child: Text(r.name.isEmpty
+                                            ? '?'
+                                            : r.name[0].toUpperCase()),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(r.name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.bold)),
+                                            Text(r.email,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall),
+                                          ],
+                                        ),
+                                      ),
+                                      Tooltip(
+                                        message: r.isActive
+                                            ? 'Active'
+                                            : 'Deactivated',
+                                        child: Switch(
+                                          value: r.isActive,
+                                          onChanged: (v) => _toggle(r, v),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  Tooltip(
-                                    message: r.isActive ? 'Active' : 'Deactivated',
-                                    child: Switch(value: r.isActive, onChanged: (v) => _toggle(r, v)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                      '${r.phone ?? 'No phone'}  •  ${r.activeParcels} active deliveries'),
+                                  const SizedBox(height: 8),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: OutlinedButton.icon(
+                                      onPressed: r.activeParcels == 0
+                                          ? null
+                                          : () async {
+                                              await showRouteDialog(context,
+                                                  riderId: r.id);
+                                              _load();
+                                            },
+                                      icon: const Icon(Icons.route),
+                                      label: const Text('Optimize route'),
+                                    ),
                                   ),
                                 ],
                               ),

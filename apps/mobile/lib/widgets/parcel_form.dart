@@ -17,13 +17,26 @@ class ParcelFormDialog extends StatefulWidget {
 
 class _ParcelFormDialogState extends State<ParcelFormDialog> {
   static const _fields = [
-    'sender_name', 'sender_phone', 'sender_email', 'pickup_address',
-    'receiver_name', 'receiver_phone', 'receiver_email', 'delivery_address',
-    'description', 'weight_kg', 'pickup_lat', 'pickup_lng', 'drop_lat', 'drop_lng',
+    'sender_name',
+    'sender_phone',
+    'sender_email',
+    'pickup_address',
+    'receiver_name',
+    'receiver_phone',
+    'receiver_email',
+    'delivery_address',
+    'description',
+    'weight_kg',
+    'pickup_lat',
+    'pickup_lng',
+    'drop_lat',
+    'drop_lng',
   ];
 
   final _formKey = GlobalKey<FormState>();
-  final Map<String, TextEditingController> _c = {for (final f in _fields) f: TextEditingController()};
+  final Map<String, TextEditingController> _c = {
+    for (final f in _fields) f: TextEditingController()
+  };
   String _service = 'standard';
   bool _busy = false;
   String? _error;
@@ -57,9 +70,13 @@ class _ParcelFormDialogState extends State<ParcelFormDialog> {
     return fee.toDouble();
   }
 
-  Widget _f(String key, String label, {bool required = true, TextInputType? type, double width = 270}) {
+  Widget _f(String key, String label,
+      {bool required = true, TextInputType? type, double width = 270}) {
     return SizedBox(
-      width: width,
+      width: min(
+        width,
+        max(0.0, min(480.0, MediaQuery.sizeOf(context).width - 112)),
+      ),
       child: TextFormField(
         controller: _c[key],
         keyboardType: type,
@@ -68,7 +85,9 @@ class _ParcelFormDialogState extends State<ParcelFormDialog> {
           border: const OutlineInputBorder(),
           isDense: true,
         ),
-        validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null : null,
+        validator: required
+            ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null
+            : null,
         onChanged: key == 'weight_kg' ? (_) => setState(() {}) : null,
       ),
     );
@@ -85,7 +104,8 @@ class _ParcelFormDialogState extends State<ParcelFormDialog> {
     for (final f in _fields) {
       final v = _c[f]!.text.trim();
       if (v.isEmpty) continue;
-      final numeric = f == 'weight_kg' || f.endsWith('_lat') || f.endsWith('_lng');
+      final numeric =
+          f == 'weight_kg' || f.endsWith('_lat') || f.endsWith('_lng');
       body[f] = numeric ? (double.tryParse(v) ?? v) : v;
     }
 
@@ -102,68 +122,112 @@ class _ParcelFormDialogState extends State<ParcelFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 500;
+    final contentWidth =
+        min(480.0, max(0.0, MediaQuery.sizeOf(context).width - 64));
+    final cancelButton = TextButton(
+      onPressed: _busy ? null : () => Navigator.pop(context),
+      child: const Text('Cancel'),
+    );
+    final submitButton = FilledButton(
+      onPressed: _busy ? null : _submit,
+      child: _busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Text('Book parcel'),
+    );
+
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
       title: const Text('Book a parcel'),
       content: SizedBox(
-        width: 600,
+        width: contentWidth,
         child: SingleChildScrollView(
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Sender / pickup', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Sender / pickup',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Wrap(spacing: 12, runSpacing: 12, children: [
                   _f('sender_name', 'Sender name'),
                   _f('sender_phone', 'Sender phone', type: TextInputType.phone),
-                  _f('sender_email', 'Sender email', required: false, type: TextInputType.emailAddress),
+                  _f('sender_email', 'Sender email',
+                      required: false, type: TextInputType.emailAddress),
                   _f('pickup_address', 'Pickup address', width: 552),
                 ]),
                 const SizedBox(height: 16),
-                const Text('Receiver / delivery', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Receiver / delivery',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Wrap(spacing: 12, runSpacing: 12, children: [
                   _f('receiver_name', 'Receiver name'),
-                  _f('receiver_phone', 'Receiver phone', type: TextInputType.phone),
-                  _f('receiver_email', 'Receiver email (for updates)', required: false, type: TextInputType.emailAddress),
+                  _f('receiver_phone', 'Receiver phone',
+                      type: TextInputType.phone),
+                  _f('receiver_email', 'Receiver email (for updates)',
+                      required: false, type: TextInputType.emailAddress),
                   _f('delivery_address', 'Delivery address', width: 552),
                 ]),
                 const SizedBox(height: 16),
-                const Text('Parcel', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Parcel',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                  _f('description', 'Contents', required: false),
-                  _f('weight_kg', 'Weight (kg)', type: const TextInputType.numberWithOptions(decimal: true), width: 130),
-                  SizedBox(
-                    width: 130,
-                    child: DropdownButtonFormField<String>(
-                      value: _service,
-                      decoration: const InputDecoration(labelText: 'Service', border: OutlineInputBorder(), isDense: true),
-                      items: const [
-                        DropdownMenuItem(value: 'standard', child: Text('Standard')),
-                        DropdownMenuItem(value: 'express', child: Text('Express')),
-                      ],
-                      onChanged: (v) => setState(() => _service = v ?? 'standard'),
-                    ),
-                  ),
-                ]),
+                Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _f('description', 'Contents', required: false),
+                      _f('weight_kg', 'Weight (kg)',
+                          type: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          width: 130),
+                      SizedBox(
+                        width: 220,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _service,
+                          decoration: const InputDecoration(
+                              labelText: 'Service',
+                              border: OutlineInputBorder(),
+                              isDense: true),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'standard', child: Text('Standard')),
+                            DropdownMenuItem(
+                                value: 'express', child: Text('Express')),
+                          ],
+                          onChanged: (v) =>
+                              setState(() => _service = v ?? 'standard'),
+                        ),
+                      ),
+                    ]),
                 if (widget.isStaff)
                   ExpansionTile(
                     tilePadding: EdgeInsets.zero,
-                    title: const Text('Map coordinates (optional - detected from the addresses)'),
+                    title: const Text(
+                        'Map coordinates (optional - detected from the addresses)'),
                     children: [
                       Wrap(spacing: 12, runSpacing: 12, children: [
-                        _f('pickup_lat', 'Pickup latitude', required: false, width: 130),
-                        _f('pickup_lng', 'Pickup longitude', required: false, width: 130),
-                        _f('drop_lat', 'Drop-off latitude', required: false, width: 130),
-                        _f('drop_lng', 'Drop-off longitude', required: false, width: 130),
+                        _f('pickup_lat', 'Pickup latitude',
+                            required: false, width: 130),
+                        _f('pickup_lng', 'Pickup longitude',
+                            required: false, width: 130),
+                        _f('drop_lat', 'Drop-off latitude',
+                            required: false, width: 130),
+                        _f('drop_lng', 'Drop-off longitude',
+                            required: false, width: 130),
                       ]),
                       const SizedBox(height: 8),
                     ],
                   ),
                 const SizedBox(height: 12),
-                Text('Estimated fee: ${money(_fee)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text('Estimated fee: ${money(_fee)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 if (_error != null) ...[
                   const SizedBox(height: 8),
                   Text(_error!, style: TextStyle(color: Colors.red.shade700)),
@@ -173,15 +237,17 @@ class _ParcelFormDialogState extends State<ParcelFormDialog> {
           ),
         ),
       ),
-      actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(
-          onPressed: _busy ? null : _submit,
-          child: _busy
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Book parcel'),
-        ),
-      ],
+      actions: compact
+          ? [
+              SizedBox(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [cancelButton, submitButton],
+                ),
+              ),
+            ]
+          : [cancelButton, submitButton],
     );
   }
 }

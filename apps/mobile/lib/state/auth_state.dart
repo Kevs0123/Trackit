@@ -15,7 +15,8 @@ class AuthState extends ChangeNotifier {
     if (saved != null) {
       api.token = saved;
       try {
-        user = AppUser.fromJson(Map<String, dynamic>.from(await api.get('/auth/me')));
+        user = AppUser.fromJson(
+            Map<String, dynamic>.from(await api.get('/auth/me')));
       } catch (_) {
         api.token = null;
         await prefs.remove('token');
@@ -26,25 +27,28 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> login(String email, String password) async {
-    final d = await api.post('/auth/login', {'email': email, 'password': password});
+    final d =
+        await api.post('/auth/login', {'email': email, 'password': password});
     await _store(d);
   }
 
-  Future<void> register(String name, String email, String phone, String password) async {
-    await api.post('/auth/register', {
+  Future<void> register(
+      String name, String email, String phone, String password) async {
+    final d = await api.post('/auth/register', {
       'name': name,
       'email': email,
       if (phone.isNotEmpty) 'phone': phone,
       'password': password,
     });
+    await _store(d);
   }
 
-  Future<void> resendVerification(String email) async {
-    await api.post('/auth/email/verification-notification', {'email': email});
-  }
-
-  Future<void> requestPasswordReset(String email) async {
-    await api.post('/auth/forgot-password', {'email': email});
+  Future<String?> requestPasswordReset(String email) async {
+    final response = await api.post('/auth/forgot-password', {'email': email});
+    if (response is Map && response['reset_url'] is String) {
+      return response['reset_url'] as String;
+    }
+    return null;
   }
 
   Future<void> resetPassword({

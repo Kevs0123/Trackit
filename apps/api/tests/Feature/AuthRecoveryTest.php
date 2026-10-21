@@ -4,10 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
@@ -16,10 +14,8 @@ class AuthRecoveryTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_customer_registration_requires_email_verification_before_login(): void
+    public function test_customer_registration_accepts_valid_email_and_returns_login_credentials(): void
     {
-        Notification::fake();
-
         $response = $this->postJson('/api/auth/register', [
             'name' => 'New Customer',
             'email' => 'new-customer@example.com',
@@ -27,105 +23,52 @@ class AuthRecoveryTest extends TestCase
         ]);
 
         $response->assertCreated()
-            ->assertJsonMissingPath('token')
-            ->assertJsonPath('message', 'Account created. Check your email for a verification link before signing in.');
+            ->assertJsonStructure(['token', 'user' => ['id', 'name', 'email', 'role']])
+            ->assertJsonPath('user.email', 'new-customer@example.com');
 
         $user = User::where('email', 'new-customer@example.com')->firstOrFail();
-        $this->assertNull($user->email_verified_at);
-        Notification::assertSentTo($user, VerifyEmail::class);
+        $this->assertDatabaseHas('personal_access_tokens', [
+            'tokenable_id' => $user->id,
+            'name' => 'trackit',
+        ]);
+    }
+
+    public function test_registration_and_login_normalize_email_case_and_whitespace(): void
+    {
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Normalized Customer',
+            'email' => '  New-Customer@Example.COM ',
+            'password' => 'a-secure-password',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('user.email', 'new-customer@example.com');
 
         $this->postJson('/api/auth/login', [
-            'email' => 'new-customer@example.com',
+            'email' => '  NEW-CUSTOMER@EXAMPLE.COM ',
             'password' => 'a-secure-password',
-        ])->assertForbidden()
-            ->assertJsonPath('message', 'Verify your email before signing in. You can request another verification email.');
-    }
-
-    public function test_registration_sends_verification_through_the_gmail_api_mailer(): void
-    {
-        config([
-            'mail.default' => 'gmail_api',
-            'mail.mailers.gmail_api' => [
-                'transport' => 'gmail_api',
-                'client_id' => 'test-client-id',
-                'client_secret' => 'test-client-secret',
-                'refresh_token' => 'test-refresh-token',
-            ],
-            'mail.from.address' => 'trackit@gmail.com',
-            'mail.from.name' => 'TrackIt',
-        ]);
-        Http::fake([
-            'https://oauth2.googleapis.com/token' => Http::response([
-                'access_token' => 'test-access-token',
-                'expires_in' => 3600,
-            ]),
-            'https://gmail.googleapis.com/gmail/v1/users/me/messages/send' => Http::response([
-                'id' => 'gmail-message-id',
-            ]),
-        ]);
+        ])->assertOk()->assertJsonPath('user.email', 'new-customer@example.com');
 
         $this->postJson('/api/auth/register', [
-            'name' => 'New Customer',
-            'email' => 'new-customer@example.com',
-            'password' => 'a-secure-password',
-        ])->assertCreated();
-
-        Http::assertSent(fn ($request) => $request->url() ===
-            'https://gmail.googleapis.com/gmail/v1/users/me/messages/send');
+            'name' => 'Duplicate Customer',
+            'email' => 'NEW-CUSTOMER@EXAMPLE.COM',
+            'password' => 'another-secure-password',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['email']);
     }
 
-    public function test_registration_returns_service_unavailable_when_gmail_api_cannot_be_reached(): void
+    public function test_registration_rejects_invalid_email_addresses(): void
     {
-        config([
-            'mail.default' => 'gmail_api',
-            'mail.mailers.gmail_api' => [
-                'transport' => 'gmail_api',
-                'client_id' => 'test-client-id',
-                'client_secret' => 'test-client-secret',
-                'refresh_token' => 'test-refresh-token',
-            ],
-        ]);
-        Http::fake([
-            'https://oauth2.googleapis.com/token' => Http::failedConnection('network unavailable'),
-        ]);
-
         $this->postJson('/api/auth/register', [
             'name' => 'New Customer',
-            'email' => 'new-customer@example.com',
+            'email' => 'not-an-email',
             'password' => 'a-secure-password',
-        ])->assertServiceUnavailable()
-            ->assertJsonPath('message', 'We could not send the verification email. Please try again later.');
-
-        $this->assertDatabaseMissing('users', ['email' => 'new-customer@example.com']);
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['email']);
     }
 
-    public function test_signed_verification_link_verifies_the_address_and_allows_login(): void
+    public function test_customer_can_sign_in_without_verifying_email(): void
     {
-        Notification::fake();
-        $this->postJson('/api/auth/register', [
-            'name' => 'New Customer',
-            'email' => 'new-customer@example.com',
-            'password' => 'a-secure-password',
-        ])->assertCreated();
-
-        $user = User::where('email', 'new-customer@example.com')->firstOrFail();
-        $notification = Notification::sent($user, VerifyEmail::class)->first();
-        $verificationUrl = $notification->toMail($user)->actionUrl;
-        $url = parse_url($verificationUrl);
-
-        $this->get($url['path'].'?'.$url['query'])
-            ->assertRedirect(rtrim(config('trackit.frontend_url'), '/').'/#/verify-email?status=success');
-
-        $this->assertNotNull($user->fresh()->email_verified_at);
-        $this->postJson('/api/auth/login', [
-            'email' => 'new-customer@example.com',
-            'password' => 'a-secure-password',
-        ])->assertOk()->assertJsonStructure(['token', 'user']);
-    }
-
-    public function test_verification_can_be_resent_without_disclosing_account_existence(): void
-    {
-        Notification::fake();
         User::create([
             'name' => 'Unverified Customer',
             'email' => 'unverified@example.com',
@@ -133,22 +76,10 @@ class AuthRecoveryTest extends TestCase
             'role' => 'customer',
         ]);
 
-        $response = $this->postJson('/api/auth/email/verification-notification', [
+        $this->postJson('/api/auth/login', [
             'email' => 'unverified@example.com',
-        ]);
-
-        $response->assertOk()->assertJsonPath(
-            'message',
-            'If an unverified customer account exists for that address, a verification link has been sent.',
-        );
-        Notification::assertSentTo(
-            User::where('email', 'unverified@example.com')->firstOrFail(),
-            VerifyEmail::class,
-        );
-
-        $this->postJson('/api/auth/email/verification-notification', [
-            'email' => 'nobody@example.com',
-        ])->assertExactJson($response->json());
+            'password' => 'a-secure-password',
+        ])->assertOk()->assertJsonStructure(['token', 'user']);
     }
 
     public function test_password_reset_request_is_generic_and_sends_a_reset_notification(): void
@@ -162,7 +93,7 @@ class AuthRecoveryTest extends TestCase
         ]);
 
         $response = $this->postJson('/api/auth/forgot-password', [
-            'email' => 'reset@example.com',
+            'email' => ' RESET@EXAMPLE.COM ',
         ]);
 
         $response->assertOk()->assertJsonPath(
@@ -175,10 +106,83 @@ class AuthRecoveryTest extends TestCase
             '/#/reset-password?token=',
             $notification->toMail($user)->actionUrl,
         );
+        $this->assertStringStartsWith(
+            'http://localhost:8080/#/reset-password?token=',
+            $notification->toMail($user)->actionUrl,
+        );
 
         $this->postJson('/api/auth/forgot-password', [
             'email' => 'nobody@example.com',
         ])->assertExactJson($response->json());
+    }
+
+    public function test_local_password_reset_returns_a_working_link_without_sending_email(): void
+    {
+        Notification::fake();
+        $this->app['env'] = 'local';
+        config(['trackit.frontend_url' => 'http://localhost:8080']);
+        $user = User::create([
+            'name' => 'Local Reset Customer',
+            'email' => 'local-reset@example.com',
+            'password' => 'old-secure-password',
+            'role' => 'customer',
+        ]);
+
+        $response = $this->postJson('/api/auth/forgot-password', [
+            'email' => ' LOCAL-RESET@EXAMPLE.COM ',
+        ])->assertOk()
+            ->assertJsonPath(
+                'message',
+                'Email delivery is disabled in local development. Open the reset page below.',
+            );
+
+        $resetUrl = $response->json('reset_url');
+        $this->assertStringStartsWith(
+            'http://localhost:8080/#/reset-password?',
+            $resetUrl,
+        );
+        $fragment = parse_url($resetUrl, PHP_URL_FRAGMENT);
+        parse_str(parse_url($fragment, PHP_URL_QUERY), $query);
+        $this->assertSame($user->email, $query['email']);
+
+        Notification::assertNothingSent();
+        $this->postJson('/api/auth/reset-password', [
+            'token' => $query['token'],
+            'email' => $query['email'],
+            'password' => 'new-secure-password',
+            'password_confirmation' => 'new-secure-password',
+        ])->assertOk();
+        $this->assertTrue(Hash::check('new-secure-password', $user->fresh()->password));
+    }
+
+    public function test_password_reset_reports_mail_transport_failure_without_exposing_details(): void
+    {
+        $this->app['env'] = 'testing';
+        User::create([
+            'name' => 'Reset Customer',
+            'email' => 'smtp-failure@example.com',
+            'password' => 'a-secure-password',
+            'role' => 'customer',
+        ]);
+        Notification::shouldReceive('send')
+            ->once()
+            ->andThrow(new \RuntimeException('SMTP credentials must not be exposed'));
+        \Illuminate\Support\Facades\Log::shouldReceive('error')
+            ->once()
+            ->with('Password reset email delivery failed.', [
+                'exception' => \RuntimeException::class,
+            ]);
+
+        $this->withHeader('Origin', 'http://localhost:61942')
+            ->postJson('/api/auth/forgot-password', [
+                'email' => 'smtp-failure@example.com',
+            ])->assertServiceUnavailable()
+            ->assertHeader('Access-Control-Allow-Origin', '*')
+            ->assertJsonPath(
+                'message',
+                'The password reset email could not be sent because the email service is unavailable. Please try again later or contact support.',
+            )
+            ->assertJsonMissing(['message' => 'SMTP credentials must not be exposed']);
     }
 
     public function test_password_reset_changes_password_and_revokes_existing_tokens(): void
@@ -194,7 +198,7 @@ class AuthRecoveryTest extends TestCase
 
         $this->postJson('/api/auth/reset-password', [
             'token' => $token,
-            'email' => $user->email,
+            'email' => ' RESET-ADMIN@EXAMPLE.COM ',
             'password' => 'new-secure-password',
             'password_confirmation' => 'new-secure-password',
         ])->assertOk();

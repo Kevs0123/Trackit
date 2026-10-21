@@ -14,7 +14,7 @@ Each app keeps its own dependency manager and configuration. Run commands from t
 
 ## First-time setup
 
-Requirements: PHP 8.3+, Composer, and Flutter with web support enabled. If `apps/api/.env` already exists, keep it and skip copying the example or generating a new app key. Run migrations and seed data only when initializing a fresh database.
+Requirements: PHP 8.3+, Composer, and Flutter with web support enabled. If `apps/api/.env` already exists, keep it and skip copying the example or generating a new app key. Migrations create the schema; the seeder does not add demo data. Create a local admin only when you are ready to sign in.
 
 ```powershell
 cd apps/api
@@ -22,6 +22,7 @@ composer install
 Copy-Item .env.example .env
 php artisan key:generate
 php artisan migrate --seed
+php artisan trackit:create-admin
 ```
 
 ## Run the whole app
@@ -77,11 +78,11 @@ Riders sign in with an account created by courier staff; public sign-up creates 
 5. In **Reports**, choose a date range to review delivery, rider, rating, and fee metrics, or export a CSV.
 6. Sign out from the top bar when finished.
 
-For local development only, the database seeder creates demo accounts (`admin@trackit.test`, `rider1@trackit.test`, `rider2@trackit.test`, and `customer@trackit.test`) with the password `password`. Do not use these demo credentials in a deployed environment.
+The database seeder does not create demo users or parcels. To create the first local admin, run `php artisan trackit:create-admin` from `apps/api`; it prompts for a name, email, and private password. Public sign-up creates customer accounts, not admins.
 
 ### Production admin setup
 
-Production seeding does not create demo users or parcels. It disables any existing seeded demo accounts and revokes their API tokens. After deploying the API, run these commands from the Railway service shell:
+Production seeding does not create demo users or parcels. It disables any legacy demo accounts and revokes their API tokens. Your existing named production admin is not removed. Do not run destructive database resets against production. If you need to create an admin on a new production database, run these commands from the Railway service shell:
 
 ```sh
 php artisan db:seed --force
@@ -90,23 +91,31 @@ php artisan trackit:create-admin
 
 The admin command prompts for a name, email, and a hidden password (minimum 12 characters). Use a unique password and do not paste it into chat or commit it to the repository. Sign in with that account, then add rider accounts from the admin **Riders** tab.
 
-### Email verification and password recovery
+To intentionally clear and recreate only a local development database, run `php artisan migrate:fresh --seed` from `apps/api`. This deletes all data in the database configured by that local `.env`; never use it against production. The result is an empty app with no users. Create a new admin separately with `php artisan trackit:create-admin`.
 
-Customer registration sends a signed verification link and does not create a login session until the address is verified. Sign-in includes a resend-verification action for unverified customers. The sign-in screen also has a forgot-password flow; reset links return to the Flutter web app and expire after Laravel's configured reset-token lifetime.
+### Production email setup
 
-In production, the API defaults to Gmail's HTTPS API rather than silently logging email if `MAIL_MAILER` is missing. Registration is rolled back if the verification email cannot be submitted.
-
-Configure these values as Railway service variables (never commit mail credentials). Railway's lower-cost plans block outbound SMTP, so use Gmail's HTTPS API rather than SMTP:
+The API uses Laravel SMTP for production email. For Mailtrap, use **Email Sending**
+(not the Email Testing sandbox) and add the SMTP values shown in your Mailtrap
+account to the Railway service variables. Typical Mailtrap Email Sending values are:
 
 ```text
-APP_URL=https://<your-railway-api-domain>
-FRONTEND_URL=https://trackit-c77df.web.app
-MAIL_MAILER=gmail_api
-MAIL_FROM_ADDRESS=<your Gmail address>
+MAIL_MAILER=smtp
+# Leave MAIL_SCHEME unset for STARTTLS
+MAIL_HOST=live.smtp.mailtrap.io
+MAIL_PORT=587
+MAIL_USERNAME=api
+MAIL_PASSWORD=<Mailtrap SMTP/API token>
+MAIL_FROM_ADDRESS=<sender address on your verified domain>
 MAIL_FROM_NAME=TrackIt
-GMAIL_OAUTH_CLIENT_ID=<Google OAuth client ID>
-GMAIL_OAUTH_CLIENT_SECRET=<Google OAuth client secret>
-GMAIL_OAUTH_REFRESH_TOKEN=<Google OAuth refresh token>
 ```
 
-Enable the Gmail API in a Google Cloud project, configure its OAuth consent screen, and generate an OAuth refresh token authorized for `https://www.googleapis.com/auth/gmail.send` from the Gmail account in `MAIL_FROM_ADDRESS`. Store the OAuth values only in Railway and redeploy after setting them. Google may require OAuth app verification for broader use; OAuth apps left in Testing can have refresh tokens expire after seven days. Gmail sending limits apply. The HTTPS API is used for registration verification, verification resend, and password-reset emails.
+Mailtrap must verify a domain you own before it can deliver production email.
+Do not use the Firebase `web.app` URL or Railway `up.railway.app` URL as the
+email-sending domain. Keep credentials in Railway variables, not in source control.
+
+### Registration and password recovery
+
+Customer registration validates the email address format and uniqueness, then signs the customer in immediately. The app does not verify that the address belongs to the customer or can receive messages. The sign-in screen also has a forgot-password flow; reset links return to the Flutter web app and expire after Laravel's configured reset-token lifetime.
+
+Password-reset and parcel-status emails still use the production mailer configured above. Configure those SMTP values in Railway service variables and keep credentials out of source control.

@@ -16,7 +16,7 @@ return [
 
     'default' => env(
         'MAIL_MAILER',
-        env('APP_ENV', 'production') === 'production' ? 'gmail_api' : 'log',
+        env('APP_ENV', 'production') === 'production' ? 'smtp' : 'log',
     ),
 
     /*
@@ -40,13 +40,6 @@ return [
 
     'mailers' => [
 
-        'gmail_api' => [
-            'transport' => 'gmail_api',
-            'client_id' => env('GMAIL_OAUTH_CLIENT_ID'),
-            'client_secret' => env('GMAIL_OAUTH_CLIENT_SECRET'),
-            'refresh_token' => env('GMAIL_OAUTH_REFRESH_TOKEN'),
-        ],
-
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),
@@ -55,7 +48,7 @@ return [
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            'timeout' => (int) env('MAIL_TIMEOUT', 8),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 

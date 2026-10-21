@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * Sends an in-app notification (customers) and an email (customer, sender, receiver)
- * every time a parcel changes status. Emails go to storage/logs/laravel.log
- * while MAIL_MAILER=log, so no mail server is needed for a demo.
+ * Sends in-app notifications (customers) and email updates (customer, sender,
+ * receiver) whenever a parcel changes status. Email delivery uses Laravel's
+ * configured mailer.
  */
 class NotificationService
 {

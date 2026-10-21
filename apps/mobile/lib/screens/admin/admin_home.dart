@@ -5,6 +5,7 @@ import 'dashboard_page.dart';
 import 'parcels_page.dart';
 import 'reports_page.dart';
 import 'riders_page.dart';
+import '../../widgets/account_menu.dart';
 
 /// Courier staff area: Dashboard, Parcels, Riders, Reports.
 class AdminHome extends StatefulWidget {
@@ -29,14 +30,23 @@ class _AdminHomeState extends State<AdminHome> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
     final wide = MediaQuery.of(context).size.width >= 800;
-    final pages = <Widget>[const DashboardPage(), const ParcelsPage(), const RidersPage(), const ReportsPage()];
+    final pages = <Widget>[
+      const DashboardPage(),
+      const ParcelsPage(),
+      const RidersPage(),
+      const ReportsPage()
+    ];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('TrackIt  -  ${_titles[_index]}'),
+        title: Text(_titles[_index]),
         actions: [
-          Center(child: Text(auth.user?.name ?? '')),
-          IconButton(tooltip: 'Sign out', icon: const Icon(Icons.logout), onPressed: () => auth.logout()),
+          if (auth.user != null)
+            AccountMenu(
+              name: auth.user!.name,
+              email: auth.user!.email,
+              onSignOut: () => auth.logout(),
+            ),
         ],
       ),
       body: Row(
@@ -48,10 +58,19 @@ class _AdminHomeState extends State<AdminHome> {
               onDestinationSelected: (i) => setState(() => _index = i),
               destinations: [
                 for (var i = 0; i < _titles.length; i++)
-                  NavigationRailDestination(icon: Icon(_icons[i]), label: Text(_titles[i])),
+                  NavigationRailDestination(
+                      icon: Icon(_icons[i]), label: Text(_titles[i])),
               ],
             ),
-          Expanded(child: KeyedSubtree(key: ValueKey(_index), child: pages[_index])),
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1440),
+                child:
+                    KeyedSubtree(key: ValueKey(_index), child: pages[_index]),
+              ),
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: wide
@@ -61,7 +80,8 @@ class _AdminHomeState extends State<AdminHome> {
               onDestinationSelected: (i) => setState(() => _index = i),
               destinations: [
                 for (var i = 0; i < _titles.length; i++)
-                  NavigationDestination(icon: Icon(_icons[i]), label: _titles[i]),
+                  NavigationDestination(
+                      icon: Icon(_icons[i]), label: _titles[i]),
               ],
             ),
     );

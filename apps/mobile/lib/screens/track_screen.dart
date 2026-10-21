@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -26,12 +27,14 @@ class _TrackScreenState extends State<TrackScreen> {
   int _rating = 0;
   bool _sending = false;
   final _comment = TextEditingController();
+  final Map<String, Future<Uint8List>> _proofImageRequests = {};
 
   @override
   void initState() {
     super.initState();
     _load();
-    _timer = Timer.periodic(const Duration(seconds: AppConfig.pollSeconds), (_) {
+    _timer =
+        Timer.periodic(const Duration(seconds: AppConfig.pollSeconds), (_) {
       final p = _parcel;
       if (p != null && p.isFinal) return; // nothing more will change
       _load(silent: true);
@@ -48,7 +51,8 @@ class _TrackScreenState extends State<TrackScreen> {
   Future<void> _load({bool silent = false}) async {
     final api = context.read<AuthState>().api;
     try {
-      final d = await api.get('/track/${Uri.encodeComponent(widget.trackingNumber)}');
+      final d =
+          await api.get('/track/${Uri.encodeComponent(widget.trackingNumber)}');
       if (!mounted) return;
       setState(() {
         _parcel = Parcel.fromJson(Map<String, dynamic>.from(d));
@@ -66,6 +70,20 @@ class _TrackScreenState extends State<TrackScreen> {
     }
   }
 
+  Future<Uint8List> _loadProofImage(
+    int userId,
+    String trackingNumber,
+    int photo,
+  ) {
+    final key = '$userId:$trackingNumber:$photo';
+    return _proofImageRequests.putIfAbsent(
+      key,
+      () => context.read<AuthState>().api.getBytes(
+            '/track/${Uri.encodeComponent(trackingNumber)}/proof/$photo',
+          ),
+    );
+  }
+
   Future<void> _sendFeedback() async {
     if (_rating == 0) {
       showSnack(context, 'Please choose a star rating first.', error: true);
@@ -75,7 +93,10 @@ class _TrackScreenState extends State<TrackScreen> {
     try {
       await context.read<AuthState>().api.post(
         '/track/${Uri.encodeComponent(widget.trackingNumber)}/feedback',
-        {'rating': _rating, if (_comment.text.trim().isNotEmpty) 'feedback': _comment.text.trim()},
+        {
+          'rating': _rating,
+          if (_comment.text.trim().isNotEmpty) 'feedback': _comment.text.trim()
+        },
       );
       if (mounted) showSnack(context, 'Thank you for your feedback!');
       await _load(silent: true);
@@ -86,14 +107,20 @@ class _TrackScreenState extends State<TrackScreen> {
     }
   }
 
-  LatLng? _ll(double? a, double? b) => (a == null || b == null) ? null : LatLng(a, b);
+  LatLng? _ll(double? a, double? b) =>
+      (a == null || b == null) ? null : LatLng(a, b);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Track ${widget.trackingNumber.toUpperCase()}'),
-        actions: [IconButton(tooltip: 'Refresh', onPressed: () => _load(), icon: const Icon(Icons.refresh))],
+        actions: [
+          IconButton(
+              tooltip: 'Refresh',
+              onPressed: () => _load(),
+              icon: const Icon(Icons.refresh))
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -104,11 +131,14 @@ class _TrackScreenState extends State<TrackScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.search_off, size: 64, color: Colors.grey.shade500),
+                        Icon(Icons.search_off,
+                            size: 64, color: Colors.grey.shade500),
                         const SizedBox(height: 12),
                         Text(_error!, textAlign: TextAlign.center),
                         const SizedBox(height: 16),
-                        FilledButton(onPressed: () => Navigator.maybePop(context), child: const Text('Back')),
+                        FilledButton(
+                            onPressed: () => Navigator.maybePop(context),
+                            child: const Text('Back')),
                       ],
                     ),
                   ),
@@ -119,6 +149,7 @@ class _TrackScreenState extends State<TrackScreen> {
 
   Widget _body(Parcel p) {
     final riderPoint = _ll(p.riderLat, p.riderLng);
+    final auth = context.watch<AuthState>();
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 820),
@@ -136,8 +167,15 @@ class _TrackScreenState extends State<TrackScreen> {
                         Expanded(
                           child: SelectableText(
                             p.trackingNumber,
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold),
                           ),
+                        ),
+                        IconButton(
+                          tooltip: 'Copy tracking number',
+                          icon: const Icon(Icons.copy),
+                          onPressed: () =>
+                              copyTrackingNumber(context, p.trackingNumber),
                         ),
                         StatusChip(p.status),
                       ],
@@ -145,33 +183,118 @@ class _TrackScreenState extends State<TrackScreen> {
                     const SizedBox(height: 12),
                     _progress(p),
                     const Divider(height: 28),
-                    _info(Icons.location_on_outlined, 'From', '${p.senderName} - ${p.pickupAddress}'),
-                    _info(Icons.flag_outlined, 'To', '${p.receiverName} - ${p.deliveryAddress}'),
-                    if ((p.description ?? '').isNotEmpty) _info(Icons.inventory_2_outlined, 'Contents', p.description!),
+                    _info(Icons.location_on_outlined, 'From',
+                        '${p.senderName} - ${p.pickupAddress}'),
+                    _info(Icons.flag_outlined, 'To',
+                        '${p.receiverName} - ${p.deliveryAddress}'),
+                    if ((p.description ?? '').isNotEmpty)
+                      _info(Icons.inventory_2_outlined, 'Contents',
+                          p.description!),
                     _info(Icons.scale_outlined, 'Details',
                         '${p.weightKg} kg, ${p.serviceType == 'express' ? 'Express' : 'Standard'} service'),
                     if (p.riderName != null)
                       _info(Icons.two_wheeler, 'Rider',
                           '${p.riderName}${(p.riderPhone ?? '').isNotEmpty ? '  •  ${p.riderPhone}' : ''}'),
-                    if (p.deliveredAt != null) _info(Icons.check_circle_outline, 'Delivered', fmtDate(p.deliveredAt)),
+                    if (p.deliveredAt != null)
+                      _info(Icons.check_circle_outline, 'Delivered',
+                          fmtDate(p.deliveredAt)),
                   ],
                 ),
               ),
             ),
-            if (_ll(p.pickupLat, p.pickupLng) != null || _ll(p.dropLat, p.dropLng) != null || riderPoint != null)
+            if (p.hasProof &&
+                (auth.user?.role == 'admin' ||
+                    auth.user?.role == 'rider' ||
+                    auth.user?.role == 'customer'))
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Proof of delivery',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      if (p.podDeliveredAt != null) ...[
+                        const SizedBox(height: 4),
+                        Text('Submitted ${fmtDate(p.podDeliveredAt)}'),
+                      ],
+                      const SizedBox(height: 12),
+                      for (var index = 0; index < p.podPhotoCount; index++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: FutureBuilder<Uint8List>(
+                              future: _loadProofImage(
+                                auth.user!.id,
+                                p.trackingNumber,
+                                index,
+                              ),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasError) {
+                                  final key =
+                                      '${auth.user!.id}:${p.trackingNumber}:$index';
+                                  return Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          'Could not load proof photo: ${snapshot.error}',
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        TextButton(
+                                          onPressed: () => setState(() {
+                                            _proofImageRequests.remove(key);
+                                          }),
+                                          child: const Text('Try again'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                                if (!snapshot.hasData) {
+                                  return const SizedBox(
+                                    height: 320,
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+                                return Image.memory(
+                                  snapshot.data!,
+                                  width: double.infinity,
+                                  height: 320,
+                                  fit: BoxFit.contain,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_ll(p.pickupLat, p.pickupLng) != null ||
+                _ll(p.dropLat, p.dropLng) != null ||
+                riderPoint != null)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Live map', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text('Live map',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       Text(
                         riderPoint != null
                             ? 'Blue = rider (updated ${fmtDate(p.riderUpdated)}), green = pickup, red = destination'
                             : 'Green = pickup, red = destination. The rider appears once the parcel is on the road.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade700),
                       ),
                       const SizedBox(height: 8),
                       ParcelMap(
@@ -189,14 +312,19 @@ class _TrackScreenState extends State<TrackScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Tracking history', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Tracking history',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 8),
                     for (final e in p.events.reversed)
                       ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.circle, size: 14, color: statusColor(e.status)),
-                        title: Text(e.statusLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        leading: Icon(Icons.circle,
+                            size: 14, color: statusColor(e.status)),
+                        title: Text(e.statusLabel,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: Text([
                           if ((e.note ?? '').isNotEmpty) e.note!,
                           fmtDate(e.createdAt),
@@ -220,7 +348,10 @@ class _TrackScreenState extends State<TrackScreen> {
           children: [
             Icon(icon, size: 18, color: Colors.grey.shade600),
             const SizedBox(width: 8),
-            SizedBox(width: 70, child: Text(label, style: TextStyle(color: Colors.grey.shade700))),
+            SizedBox(
+                width: 70,
+                child:
+                    Text(label, style: TextStyle(color: Colors.grey.shade700))),
             Expanded(child: Text(value)),
           ],
         ),
@@ -232,7 +363,9 @@ class _TrackScreenState extends State<TrackScreen> {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: c.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(
+            color: c.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8)),
         child: Text(
           p.status == 'failed'
               ? 'The delivery attempt failed. The courier will contact you or try again.'
@@ -256,18 +389,25 @@ class _TrackScreenState extends State<TrackScreen> {
                     Expanded(
                       child: Divider(
                         thickness: 2,
-                        color: i == 0 ? Colors.transparent : (i <= idx ? color : Colors.grey.shade300),
+                        color: i == 0
+                            ? Colors.transparent
+                            : (i <= idx ? color : Colors.grey.shade300),
                       ),
                     ),
                     CircleAvatar(
                       radius: 12,
                       backgroundColor: i <= idx ? color : Colors.grey.shade300,
-                      child: i <= idx ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
+                      child: i <= idx
+                          ? const Icon(Icons.check,
+                              size: 14, color: Colors.white)
+                          : null,
                     ),
                     Expanded(
                       child: Divider(
                         thickness: 2,
-                        color: i == last ? Colors.transparent : (i < idx ? color : Colors.grey.shade300),
+                        color: i == last
+                            ? Colors.transparent
+                            : (i < idx ? color : Colors.grey.shade300),
                       ),
                     ),
                   ],
@@ -276,7 +416,10 @@ class _TrackScreenState extends State<TrackScreen> {
                 Text(
                   statusLabels[progressSteps[i]]!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, fontWeight: i == idx ? FontWeight.bold : FontWeight.normal),
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight:
+                          i == idx ? FontWeight.bold : FontWeight.normal),
                 ),
               ],
             ),
@@ -301,13 +444,15 @@ class _TrackScreenState extends State<TrackScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('How was your delivery?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const Text('How was your delivery?',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             Row(
               children: [
                 for (var i = 1; i <= 5; i++)
                   IconButton(
                     onPressed: () => setState(() => _rating = i),
-                    icon: Icon(i <= _rating ? Icons.star : Icons.star_border, color: Colors.amber.shade700, size: 32),
+                    icon: Icon(i <= _rating ? Icons.star : Icons.star_border,
+                        color: Colors.amber.shade700, size: 32),
                   ),
               ],
             ),
@@ -315,7 +460,9 @@ class _TrackScreenState extends State<TrackScreen> {
               controller: _comment,
               maxLines: 2,
               maxLength: 500,
-              decoration: const InputDecoration(labelText: 'Comments (optional)', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  labelText: 'Comments (optional)',
+                  border: OutlineInputBorder()),
             ),
             const SizedBox(height: 8),
             FilledButton(

@@ -12,6 +12,14 @@ class ProductionAccountSafetyTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_local_database_seeder_does_not_create_demo_data(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('parcels', 0);
+    }
+
     public function test_production_seeding_disables_demo_accounts_and_revokes_their_tokens(): void
     {
         $demo = User::create([

@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Parcel extends Model
 {
+    protected $hidden = ['pod_photo_path', 'pod_photo_paths'];
+
     public const STATUSES = [
         'booked' => 'Booked',
         'assigned' => 'Rider Assigned',
@@ -27,7 +29,7 @@ class Parcel extends Model
 
     protected $guarded = ['id'];
 
-    protected $appends = ['status_label', 'maps_url'];
+    protected $appends = ['status_label', 'maps_url', 'has_proof'];
 
     protected function casts(): array
     {
@@ -41,6 +43,8 @@ class Parcel extends Model
             'route_distance_km' => 'float',
             'assigned_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'pod_delivered_at' => 'datetime',
+            'pod_photo_paths' => 'array',
         ];
     }
 
@@ -71,5 +75,20 @@ class Parcel extends Model
         }
 
         return 'https://www.google.com/maps/search/?api=1&query='.urlencode((string) $this->delivery_address);
+    }
+
+    public function getHasProofAttribute(): bool
+    {
+        return count($this->proofPhotoPaths()) > 0 && $this->pod_delivered_at !== null;
+    }
+
+    public function proofPhotoPaths(): array
+    {
+        $paths = $this->pod_photo_paths;
+        if (! is_array($paths) || $paths === []) {
+            $paths = $this->pod_photo_path ? [$this->pod_photo_path] : [];
+        }
+
+        return array_values(array_filter($paths, fn ($path) => is_string($path) && $path !== ''));
     }
 }

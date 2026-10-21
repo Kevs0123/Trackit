@@ -5,6 +5,7 @@ import '../../state/auth_state.dart';
 import '../../utils.dart';
 import '../../widgets/parcel_form.dart';
 import '../../widgets/status_chip.dart';
+import '../../widgets/account_menu.dart';
 
 /// Customer area: my parcels, book a new parcel, notifications.
 class CustomerHome extends StatefulWidget {
@@ -35,7 +36,8 @@ class _CustomerHomeState extends State<CustomerHome> {
       if (!mounted) return;
       setState(() {
         _parcels = parseParcels(parcels);
-        _notes = (notes as List).map((e) => Map<String, dynamic>.from(e)).toList();
+        _notes =
+            (notes as List).map((e) => Map<String, dynamic>.from(e)).toList();
         _error = null;
       });
     } catch (e) {
@@ -51,7 +53,12 @@ class _CustomerHomeState extends State<CustomerHome> {
       builder: (_) => const ParcelFormDialog(isStaff: false),
     );
     if (created != null && mounted) {
-      showSnack(context, 'Parcel booked! Tracking number: ${created.trackingNumber}');
+      showSnack(
+        context,
+        'Parcel booked! Tracking number: ${created.trackingNumber}',
+        actionLabel: 'COPY',
+        onAction: () => copyTrackingNumber(context, created.trackingNumber),
+      );
       _load();
     }
   }
@@ -84,15 +91,27 @@ class _CustomerHomeState extends State<CustomerHome> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('TrackIt  -  ${auth.user?.name ?? ''}'),
+          title: const Text('My parcels'),
           actions: [
-            IconButton(tooltip: 'Refresh', icon: const Icon(Icons.refresh), onPressed: _load),
-            IconButton(tooltip: 'Sign out', icon: const Icon(Icons.logout), onPressed: () => auth.logout()),
+            IconButton(
+                tooltip: 'Refresh',
+                icon: const Icon(Icons.refresh),
+                onPressed: _load),
+            if (auth.user != null)
+              AccountMenu(
+                name: auth.user!.name,
+                email: auth.user!.email,
+                onSignOut: () => auth.logout(),
+              ),
           ],
           bottom: TabBar(tabs: [
-            const Tab(icon: Icon(Icons.inventory_2_outlined), text: 'My parcels'),
+            const Tab(
+                icon: Icon(Icons.inventory_2_outlined), text: 'My parcels'),
             Tab(
-              icon: Badge(isLabelVisible: unread > 0, label: Text('$unread'), child: const Icon(Icons.notifications_outlined)),
+              icon: Badge(
+                  isLabelVisible: unread > 0,
+                  label: Text('$unread'),
+                  child: const Icon(Icons.notifications_outlined)),
               text: 'Notifications',
             ),
           ]),
@@ -105,7 +124,25 @@ class _CustomerHomeState extends State<CustomerHome> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.cloud_off_outlined, size: 48),
+                          const SizedBox(height: 12),
+                          Text(_error!, textAlign: TextAlign.center),
+                          const SizedBox(height: 16),
+                          FilledButton.icon(
+                            onPressed: _load,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Try again'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
                 : TabBarView(children: [_parcelsTab(), _notesTab()]),
       ),
     );
@@ -121,7 +158,10 @@ class _CustomerHomeState extends State<CustomerHome> {
             TextField(
               controller: _track,
               textCapitalization: TextCapitalization.characters,
-              onSubmitted: (v) => v.trim().isEmpty ? null : Navigator.pushNamed(context, '/track/${v.trim().toUpperCase()}'),
+              onSubmitted: (v) => v.trim().isEmpty
+                  ? null
+                  : Navigator.pushNamed(
+                      context, '/track/${v.trim().toUpperCase()}'),
               decoration: const InputDecoration(
                 hintText: 'Track any parcel by number',
                 prefixIcon: Icon(Icons.search),
@@ -133,22 +173,64 @@ class _CustomerHomeState extends State<CustomerHome> {
             if (_parcels.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(32),
-                child: Center(child: Text('You have no parcels yet. Tap "Book parcel" to send one.')),
+                child: Center(
+                    child: Text(
+                        'You have no parcels yet. Tap "Book parcel" to send one.')),
               ),
             for (final p in _parcels)
               Card(
-                child: ListTile(
-                  onTap: () => Navigator.pushNamed(context, '/track/${p.trackingNumber}'),
-                  title: Row(children: [
-                    Flexible(child: Text(p.trackingNumber, style: const TextStyle(fontWeight: FontWeight.bold))),
-                    const SizedBox(width: 10),
-                    StatusChip(p.status),
-                  ]),
-                  subtitle: Text('To ${p.receiverName}\n${p.deliveryAddress}\n${money(p.fee)}  •  ${fmtDate(p.createdAt)}'),
-                  isThreeLine: true,
-                  trailing: p.status == 'booked'
-                      ? TextButton(onPressed: () => _cancel(p), child: const Text('Cancel'))
-                      : const Icon(Icons.chevron_right),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => Navigator.pushNamed(
+                      context, '/track/${p.trackingNumber}'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SelectableText(
+                                  p.trackingNumber,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                IconButton(
+                                  tooltip: 'Copy tracking number',
+                                  visualDensity: VisualDensity.compact,
+                                  icon: const Icon(Icons.copy, size: 18),
+                                  onPressed: () => copyTrackingNumber(
+                                      context, p.trackingNumber),
+                                ),
+                              ],
+                            ),
+                            StatusChip(p.status),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Delivering to ${p.receiverName}'),
+                        Text(p.deliveryAddress,
+                            maxLines: 2, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 4),
+                        Text('${money(p.fee)}  •  ${fmtDate(p.createdAt)}',
+                            style: Theme.of(context).textTheme.bodySmall),
+                        if (p.status == 'booked')
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => _cancel(p),
+                              child: const Text('Cancel parcel'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -167,22 +249,36 @@ class _CustomerHomeState extends State<CustomerHome> {
             if (_notes.isNotEmpty)
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(onPressed: _markRead, child: const Text('Mark all as read')),
+                child: TextButton(
+                    onPressed: _markRead,
+                    child: const Text('Mark all as read')),
               ),
             if (_notes.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(32),
-                child: Center(child: Text('No notifications yet. You are notified every time a parcel changes status.')),
+                child: Center(
+                    child: Text(
+                        'No notifications yet. You are notified every time a parcel changes status.')),
               ),
             for (final n in _notes)
               Card(
-                color: n['read_at'] == null ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4) : null,
+                color: n['read_at'] == null
+                    ? Theme.of(context)
+                        .colorScheme
+                        .primaryContainer
+                        .withValues(alpha: 0.4)
+                    : null,
                 child: ListTile(
-                  leading: Icon(n['read_at'] == null ? Icons.notifications_active : Icons.notifications_none),
+                  leading: Icon(n['read_at'] == null
+                      ? Icons.notifications_active
+                      : Icons.notifications_none),
                   title: Text('${n['message']}'),
-                  subtitle: Text(fmtDate(DateTime.tryParse('${n['created_at']}')?.toLocal())),
+                  subtitle: Text(fmtDate(
+                      DateTime.tryParse('${n['created_at']}')?.toLocal())),
                   onTap: () {
-                    final tn = (n['parcel'] is Map) ? n['parcel']['tracking_number'] : null;
+                    final tn = (n['parcel'] is Map)
+                        ? n['parcel']['tracking_number']
+                        : null;
                     if (tn != null) Navigator.pushNamed(context, '/track/$tn');
                   },
                 ),
